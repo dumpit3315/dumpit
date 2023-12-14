@@ -229,6 +229,9 @@ class main ( wx.Frame ):
 
 		bSizer6111111 = wx.BoxSizer( wx.HORIZONTAL )
 
+		self.bEnableMMU = wx.Button( self.dPage1, wx.ID_ANY, u"Enable MMU", wx.DefaultPosition, wx.DefaultSize, 0 )
+		bSizer6111111.Add( self.bEnableMMU, 1, wx.ALL, 5 )
+
 		self.bDisableMMU = wx.Button( self.dPage1, wx.ID_ANY, u"Disable MMU", wx.DefaultPosition, wx.DefaultSize, 0 )
 		bSizer6111111.Add( self.bDisableMMU, 1, wx.ALL, 5 )
 
@@ -237,6 +240,14 @@ class main ( wx.Frame ):
 
 
 		bSizer5.Add( bSizer6111111, 1, wx.EXPAND, 5 )
+
+		bSizer60 = wx.BoxSizer( wx.VERTICAL )
+
+		self.tOCDCmd = wx.TextCtrl( self.dPage1, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, wx.TE_PROCESS_ENTER )
+		bSizer60.Add( self.tOCDCmd, 0, wx.ALL|wx.EXPAND, 5 )
+
+
+		bSizer5.Add( bSizer60, 0, wx.EXPAND, 5 )
 
 
 		self.dPage1.SetSizer( bSizer5 )
@@ -398,6 +409,10 @@ class main ( wx.Frame ):
 
 		bSizer3.Add( self.tab, 1, wx.EXPAND |wx.ALL, 5 )
 
+		self.progress = wx.Gauge( self, wx.ID_ANY, 5000, wx.DefaultPosition, wx.DefaultSize, wx.GA_HORIZONTAL )
+		self.progress.SetValue( 2500 )
+		bSizer3.Add( self.progress, 0, wx.ALL|wx.EXPAND, 5 )
+
 
 		bSizer1.Add( bSizer3, 1, wx.EXPAND, 5 )
 
@@ -423,8 +438,10 @@ class main ( wx.Frame ):
 		self.bHalt.Bind( wx.EVT_BUTTON, self.doHalt )
 		self.bReset.Bind( wx.EVT_BUTTON, self.doReset )
 		self.bExecScript.Bind( wx.EVT_BUTTON, self.doScript )
+		self.bEnableMMU.Bind( wx.EVT_BUTTON, self.doEnableMMU )
 		self.bDisableMMU.Bind( wx.EVT_BUTTON, self.doDisableMMU )
 		self.bExec.Bind( wx.EVT_BUTTON, self.doExecAddress )
+		self.tOCDCmd.Bind( wx.EVT_TEXT_ENTER, self.doOCDCmdExec )
 		self.bConfigureLayoutFT232R.Bind( wx.EVT_BUTTON, self.doOpenFT232RConfig )
 		self.bConfigureLayoutFT232H.Bind( wx.EVT_BUTTON, self.doOpenFT232HConfig )
 		self.bDoIDCODE.Bind( wx.EVT_BUTTON, self.doIDCODE )
@@ -479,10 +496,16 @@ class main ( wx.Frame ):
 	def doScript( self, event ):
 		event.Skip()
 
+	def doEnableMMU( self, event ):
+		event.Skip()
+
 	def doDisableMMU( self, event ):
 		event.Skip()
 
 	def doExecAddress( self, event ):
+		event.Skip()
+
+	def doOCDCmdExec( self, event ):
 		event.Skip()
 
 	def doOpenFT232RConfig( self, event ):

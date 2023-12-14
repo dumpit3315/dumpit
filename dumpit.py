@@ -18,6 +18,8 @@ import re
 import libfindit
 import traceback
 import json
+from urllib import request
+import gc
 
 os.environ["WXSUPPRESS_SIZER_FLAGS_CHECK"] = "1"
 
@@ -128,7 +130,7 @@ class ForwardApp(forwardDialog.forwardDialog):
                 self._isConnect = True             
                 self._ocd = subprocess.Popen([getOCDExec(), "-c", INIT_CMD], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 
-                self._ocdSendCommand("")
+                self._ocdSendCommand("halt")
                                             
                 self._logThread = threading.Thread(target=self._doLogging)
                 self._logThread.daemon = True
@@ -430,6 +432,7 @@ class MainApp(main.main):
             self.cChipset.Append(p["name"])
             
         self.cChipset.Selection = 0
+        self.progress.Value = 0
         
         self.status.Value += "Dumpit v0.5"
         
@@ -445,7 +448,15 @@ class MainApp(main.main):
         self._sioThread = None
         self._sioMsgQueue = None
         
+        self._errMsgQueue = None
+        self._progMsgQueue = None
+        self._btnMsgQueue = None
+        
+        self._dumpThread = None
+        
         self._isRead = False
+        self._isReadCanceled = False
+        
         self._ft232h_tdi = const._ft232h_default_jtag_tdi
         self._ft232h_tdo = const._ft232h_default_jtag_tdo
         self._ft232h_tms = const._ft232h_default_jtag_tms
@@ -539,25 +550,61 @@ class MainApp(main.main):
                 pass
 
     def doLoop( self, event ):
-        if self._logThreadQueue and (self._isConnect or self._isConnectRemote) and not self._isRead:
-            try:                                
-                self.status.AppendText(self._logThreadQueue.get_nowait() + "\n")
-                self.status.ShowPosition(self.status.GetLastPosition())                
+        if self._logThreadQueue:
+            try:               
+                if not self._isRead:
+                    self.status.AppendText(self._logThreadQueue.get_nowait() + "\n")
+                    self.status.ShowPosition(self.status.GetLastPosition())                
+                
+                else:
+                    self._logThreadQueue.get_nowait()
                 
             except queue.Empty:
                 pass                
             
+        if self._errMsgQueue:
+            try:
+                p = self._errMsgQueue.get_nowait()
+                wx.MessageBox(str(p), "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
+                
+            except queue.Empty:
+                pass
+            
+        if self._progMsgQueue:
+            try:
+                p = self._progMsgQueue.get_nowait()
+                self.progress.Value = min(self.progress.Range, int(p * self.progress.Range))
+                
+            except queue.Empty:
+                pass
+            
+        if self._btnMsgQueue:
+            try:
+                p = self._btnMsgQueue.get_nowait()
+                if p:
+                    self.bDumpFlash.Enable(False)
+                    self.bDumpMemory.Enable(False)
+                    self.bStop.Enable(True)
+                    
+                else:
+                    self.bDumpFlash.Enable(True)
+                    self.bDumpMemory.Enable(True)
+                    self.bStop.Enable(False)
+                
+            except queue.Empty:
+                pass
+            
         if self._ocd and self._isConnect and self._ocd.poll() is not None:
             self._isConnect = False                        
             self.bConnect.Label = "Connect"
-            self.bConnectRemote.Enabled = True
-            self.bForwardRemote.Enabled = True
+            self.bConnectRemote.Enable(True)
+            self.bForwardRemote.Enable(True)
             
         if self._sio and self._isConnectRemote and not self._sio.connected:
             self._isConnectRemote = False                        
             self.bConnect.Label = "Connect"
-            self.bConnectRemote.Enabled = True
-            self.bForwardRemote.Enabled = True
+            self.bConnectRemote.Enable(True)
+            self.bForwardRemote.Enable(True)
             
     def _ocdSendCommand(self, cmd: str):
         if self._ocd and self._ocd.poll() is None:
@@ -586,8 +633,8 @@ class MainApp(main.main):
             self._isConnect = False            
             self._ocd.terminate()         
             self.bConnect.Label = "Connect"
-            self.bConnectRemote.Enabled = True
-            self.bForwardRemote.Enabled = True
+            self.bConnectRemote.Enable(True)
+            self.bForwardRemote.Enable(True)
             
         elif self._isConnectRemote:            
             self._isConnectRemote = False            
@@ -596,11 +643,12 @@ class MainApp(main.main):
                 self._sio.disconnect()
                                
             self.bConnect.Label = "Connect"
-            self.bConnectRemote.Enabled = True
-            self.bForwardRemote.Enabled = True                    
+            self.bConnectRemote.Enable(True)
+            self.bForwardRemote.Enable(True)                    
             
         else:            
             if self._ocd and self._ocd.poll() is None: self._ocd.kill()
+            gc.collect()
                        
             INIT_CMD = getInitCmd(self)            
                 
@@ -610,9 +658,13 @@ class MainApp(main.main):
             self.status.Value = f"Command-line arguments: openocd {INIT_CMD}\n\n"
             self._ocd = subprocess.Popen([getOCDExec(), "-c", INIT_CMD], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             
-            self._ocdSendCommand("")
+            self._ocdSendCommand("halt")
             
             self._logThreadQueue = queue.Queue()
+            
+            self._errMsgQueue = queue.Queue()
+            self._progMsgQueue = queue.Queue()
+            self._btnMsgQueue = queue.Queue()
             
             self._logThread = threading.Thread(target=self._doLogging)
             self._logThread.daemon = True
@@ -620,12 +672,15 @@ class MainApp(main.main):
             self._logThread.start()
             
             self.bConnect.Label = "Disconnect"
-            self.bConnectRemote.Enabled = False
-            self.bForwardRemote.Enabled = False
+            self.bConnectRemote.Enable(False)
+            self.bForwardRemote.Enable(False)
+            
+            idcode = self.cmd_get_idcode()            
         
     def doConnectRemote(self, event):
         try:
             self._sio = socketio.SimpleClient()
+            gc.collect()
                                                   
             self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith("::1") or self.bTargetRemote.Value.startswith("[::1]") else f"https://{self.bTargetRemote.Value}/", transports=["websocket"], socketio_path="dumpit_remote")
                                                             
@@ -645,6 +700,10 @@ class MainApp(main.main):
             self._logThreadQueue = queue.Queue()
             self._sioMsgQueue = queue.Queue()
             
+            self._errMsgQueue = queue.Queue()
+            self._progMsgQueue = queue.Queue()
+            self._btnMsgQueue = queue.Queue()
+            
             self._sioThread = threading.Thread(target=self._doWSLoop)
             self._sioThread.daemon = True
             
@@ -653,8 +712,10 @@ class MainApp(main.main):
             self._isConnectRemote = True
             
             self.bConnect.Label = "Disconnect"
-            self.bConnectRemote.Enabled = False
-            self.bForwardRemote.Enabled = False            
+            self.bConnectRemote.Enable(False)
+            self.bForwardRemote.Enable(False)   
+            
+            idcode = self.cmd_get_idcode()                     
                         
         except Exception as e:
             if self._sio and self._sio.connected: 
@@ -685,8 +746,16 @@ class MainApp(main.main):
     def doHexCheck( self, event: wx.CommandEvent ):
         event.EventObject.ChangeValue(re.sub("([^0-9a-fA-F]+)", "", event.EventObject.GetValue()))    
 
-    def cmd_read_u8(self, offset: int, size: int=1):
+    def cmd_get_idcode(self):
         if not self._isConnect and not self._isConnectRemote: return b""
+        try:
+            return int(self._ocdSendCommand("jtag cget target.cpu -idcode"))
+        
+        except Exception:
+            return 0
+
+    def cmd_read_u8(self, offset: int, size: int=1):
+        if not self._isConnect and not self._isConnectRemote: return 0 if size <= 1 else b""
         c = self._ocdSendCommand(f"read_memory {hex(offset)} 8 {size}")
                         
         if c.startswith("0x"):
@@ -696,24 +765,36 @@ class MainApp(main.main):
             return 0xff if size <= 1 else b"\xff" * size
         
     def cmd_read_u16(self, offset: int, size: int=1):
-        if not self._isConnect and not self._isConnectRemote: return b""
+        if not self._isConnect and not self._isConnectRemote: return 0 if size <= 1 else []
         c = self._ocdSendCommand(f"read_memory {hex(offset)} 16 {size}")
                         
         if c.startswith("0x"):
-            return int(c, 16) if size <= 1 else bytes([int(x, 16) for x in c.split(" ")])
+            return int(c, 16) if size <= 1 else [int(x, 16) for x in c.split(" ")]
             
         else:
             return 0xffff if size <= 1 else b"\xff\xff" * size
         
     def cmd_read_u32(self, offset: int, size: int=1):
-        if not self._isConnect and not self._isConnectRemote: return b""
+        if not self._isConnect and not self._isConnectRemote: return 0 if size <= 1 else []
         c = self._ocdSendCommand(f"read_memory {hex(offset)} 32 {size}")
                         
         if c.startswith("0x"):
-            return int(c, 16) if size <= 1 else bytes([int(x, 16) for x in c.split(" ")])
+            return int(c, 16) if size <= 1 else [int(x, 16) for x in c.split(" ")]
             
         else:
             return 0xffffffff if size <= 1 else b"\xff\xff\xff\xff" * size
+    
+    def cmd_read_cp15(self, cr_n, op_1, cr_m, op_2):
+        if not self._isConnect and not self._isConnectRemote: return 0
+        try:
+            return int(self._ocdSendCommand(f"arm mrc 15 {op_1} {cr_n} {cr_m} {op_2}"), 16)
+            
+        except Exception:
+            return 0
+        
+    def cmd_write_cp15(self, cr_n, op_1, cr_m, op_2, value):
+        if not self._isConnect and not self._isConnectRemote: return 0
+        self._ocdSendCommand(f"arm mcr 15 {op_1} {cr_n} {cr_m} {op_2} {value}")
         
     def cmd_write_u8(self, offset: int, value: int):
         if not self._isConnect and not self._isConnectRemote: return
@@ -727,332 +808,375 @@ class MainApp(main.main):
         if not self._isConnect and not self._isConnectRemote: return
         self._ocdSendCommand(f"mww {hex(offset)} {hex(value)}")
         
+    def doReadMemoryThread( self, name, cOffset, eOffset ):
+        self._isRead = True
+        self._isReadCanceled = False
+        
+        self._btnMsgQueue.put(True)
+        
+        try:                                        
+            with open(name, "wb") as tempFile:
+                while cOffset < eOffset and not self._isReadCanceled:                
+                    tempFile.write(self.cmd_read_u8(cOffset, min(0x200, eOffset - cOffset)))
+                    cOffset += min(0x200, eOffset - cOffset)
+                    
+                    self._progMsgQueue.put(cOffset/eOffset)
+                    
+        except Exception as e:
+            traceback.print_exc()
+            self._errMsgQueue.put(str(e))
+                    
+        finally:
+            self._logThreadQueue.queue.clear()
+            time.sleep(1)
+            self._btnMsgQueue.put(False)
+            self._isRead = False
+            self._isReadCanceled = False
+        
     def doReadMemory( self, event ):
-        if not self._isConnect and not self._isConnectRemote: return
+        if (not self._isConnect and not self._isConnectRemote) or self._isRead: return
         
         cOffset = int(self.tStart.Value, 16)
         eOffset = int(self.tEnd.Value, 16)
+        
+        if cOffset >= eOffset:
+            return wx.MessageBox(f"start offset must be less than end offset", "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
     
         with wx.FileDialog(self, "Dump memory", wildcard="Binary file|*.bin", style=wx.FD_SAVE) as fd:
             fd: wx.FileDialog
             if fd.ShowModal() != wx.ID_CANCEL:                
-                self._isRead = True
+                self.progress.Value = 0
                 
-                try:                                        
-                    with open(fd.GetPath(), "wb") as tempFile:
-                        while cOffset < eOffset:
-                            tempFile.write(self.cmd_read_u8(cOffset, min(0x200, eOffset - cOffset)))
-                            cOffset += min(0x200, eOffset - cOffset)
+                self._dumpThread = threading.Thread(target=self.doReadMemoryThread, args=(fd.GetPath(), cOffset, eOffset))
+                self._dumpThread.daemon = True
+                
+                self._dumpThread.start()
+                        
+    def doReadFlashThread( self, name, cOffset, eOffset ):
+        spareBuf = bytearray()
+        bbBuf = bytearray()
+        
+        self._isRead = True
+        self._isReadCanceled = False
+        
+        self._btnMsgQueue.put(True)
+            
+        try:                    
+            if const._platforms[self.cChipset.Selection]["mode"] in [1, 2]:
+                self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 7)                    
+                _msleep(const._jtag_init_delay)
+
+                if self.bECCDisable.Value:
+                    self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg"], 16), self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg"], 16)) | 1)
+
+                else:
+                    self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg"], 16), self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg"], 16)) & 0xfffffffe)
+                                                
+            elif const._platforms[self.cChipset.Selection]["mode"] == 3:
+                self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 0x31)
+                self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_exec_cmd"], 16), 1)
+                _msleep(const._jtag_init_delay)
+                
+                self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 0xD)
+                self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_exec_cmd"], 16), 1)
+                _msleep(const._jtag_init_delay)
+
+                if self.bECCDisable.Value:
+                    self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16), (self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16)) | 1) | (1 << 1))
+
+                else:
+                    self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16), (self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16)) & 0xfffffffe) | (1 << 1))
+
+            elif const._platforms[self.cChipset.Selection]["mode"] == 5:
+                if const._platforms[self.cChipset.Selection]["reg_width"] in [0, 1]:
+                    self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_cmd"], 0xff)                                        
+                
+                elif const._platforms[self.cChipset.Selection]["reg_width"] == 2:
+                    self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_cmd"], 0xff)
+                                        
+                elif const._platforms[self.cChipset.Selection]["reg_width"] == 4:
+                    self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_cmd"], 0xff)
+                    
+                _msleep(const._jtag_init_delay)
+                                        
+            with open(name, "wb") as tempFile:
+                while cOffset < eOffset and not self._isReadCanceled:
+                    if const._platforms[self.cChipset.Selection]["mode"] == 1:
+                        self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_addr"], 16), cOffset)
+                        
+                        for _ in range(4 if self.cNandSize.Selection == 1 else 1):
+                            self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 1)
                             
-                except Exception as e:
-                    traceback.print_exc()
-                    wx.MessageBox(str(e), "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
+                            for _ in range(0x2500):
+                                _msleep(const._jtag_sleep_delay)
+                                if self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_wait_status"], 16)) & 8192: break
                             
-                finally:
-                    self._isRead = False
+                            tempFile.write(self.cmd_read_u8(int(const._platforms[self.cChipset.Selection]["flash_buffer"], 16), 0x200))
+                            
+                            spareBuf += self.cmd_read_u8(int(const._platforms[self.cChipset.Selection]["flash_buffer"], 16) + 0x200, 0x10)
+                            
+                            cOffset += 0x200 
+                            if cOffset >= eOffset: break    
+                            
+                    elif const._platforms[self.cChipset.Selection]["mode"] == 2:
+                        self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_addr"], 16), cOffset)
+                        
+                        for _ in range(4 if self.cNandSize.Selection == 1 else 1):
+                            self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 1)
+                            
+                            for _ in range(0x2500):
+                                _msleep(const._jtag_sleep_delay)
+                                if self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_wait_status"], 16)) & 2: break
+                            
+                            tempFile.write(self.cmd_read_u8(int(const._platforms[self.cChipset.Selection]["flash_buffer"], 16), 0x200))
+                            
+                            spareBuf += self.cmd_read_u8(int(const._platforms[self.cChipset.Selection]["flash_buffer"], 16) + 0x200, 0x10)
+                            
+                            cOffset += 0x200    
+                            if cOffset >= eOffset: break   
+                
+                    elif const._platforms[self.cChipset.Selection]["mode"] == 3:
+                        self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 0x34)
+                        
+                        flash_write = ((cOffset >> 11) << 16) | ((cOffset >> 1) & 0x3ff) if self.cNandSize.Selection == 1 else ((cOffset >> 9) << 8) | ((cOffset >> 1) & 0xff)
+                        
+                        self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_addr0"], 16), flash_write & 0xffffffff)
+                        self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_addr1"], 16), (flash_write >> 32) & 0xffffffff)
+                        
+                        for _ in range(4 if self.cNandSize.Selection == 1 else 1):
+                            self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_exec_cmd"], 16), 1)
+                            
+                            for _ in range(0x2500):
+                                _msleep(const._jtag_sleep_delay)
+                                if (self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_status"], 16)) & 0xf) == 0: break
+                            
+                            tempChunk = self.cmd_read_u8(int(const._platforms[self.cChipset.Selection]["flash_buffer"], 16), 0x210)
+                            
+                            if self.bBadBlockinData:
+                                tempFile.write(tempChunk[:0x1d0] + tempChunk[0x1d2:0x202])
+                                spareBuf += tempChunk[0x202:] + b"\xff\xff"
+                                bbBuf += tempChunk[0x1d0:0x1d2]
+                                
+                            else:
+                                tempFile.write(tempChunk[:0x200])
+                                spareBuf += tempChunk[0x200:]
+                            
+                            cOffset += 0x200      
+                            if cOffset >= eOffset: break
+                
+                    elif const._platforms[self.cChipset.Selection]["mode"] == 4:
+                        tempFile.write(self.cmd_read_u8(cOffset, 0x200))
+                        cOffset += 0x200
+                        
+                    elif const._platforms[self.cChipset.Selection]["mode"] == 5:
+                        if const._platforms[self.cChipset.Selection]["reg_width"] == 0:
+                            if self.cNandSize.Selection == 1:
+                                self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_cmd"], 0x00)
+                                
+                                self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
+                                self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 8) & 0xf)
+                                
+                                self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 11) & 0xff)
+                                self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 11) >> 8) & 0xff)
+                                self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 11) >> 16) & 0xff)
+                                
+                                self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_cmd"], 0x30)
+                            
+                            else:
+                                self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_cmd"], (cOffset >> 8) & 1)
+                                
+                                self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
+                                
+                                self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 9) & 0xff)
+                                self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 9) >> 8) & 0xff)                                    
+                                self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 9) >> 16) & 0xff)                                    
+                                
+                            for _ in range(0x2500):
+                                _msleep(const._jtag_sleep_delay)
+                                if const._platforms[self.cChipset.Selection]["wait_mask"] is not None:
+                                    if self.cmd_read_u32(const._platforms[self.cChipset.Selection]["flash_wait"]) & const._platforms[self.cChipset.Selection]["wait_mask"]: break                                    
+                        
+                            temp_buf = []
+                            for _ in range(0x800 if self.cNandSize.Selection == 1 else 0x200):
+                                temp_buf.append(self.cmd_read_u8(const._platforms[self.cChipset.Selection]["flash_buffer"]))
+                                cOffset += 1
+                                
+                                if cOffset >= eOffset: break
+                                
+                            tempFile.write(bytes(temp_buf))
+                            if cOffset >= eOffset: break
+                        
+                        elif const._platforms[self.cChipset.Selection]["reg_width"] == 1:
+                            self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_cmd"], 0)
+                                
+                            self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 1) & 0xff)
+                            
+                            self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 9) & 0xff)
+                            self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 9) >> 8) & 0xff)                                    
+                            self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 9) >> 16) & 0xff)                                    
+                            
+                            for _ in range(0x2500):
+                                _msleep(const._jtag_sleep_delay)
+                                if const._platforms[self.cChipset.Selection]["wait_mask"] is not None:
+                                    if self.cmd_read_u32(const._platforms[self.cChipset.Selection]["flash_wait"]) & const._platforms[self.cChipset.Selection]["wait_mask"]: break                                    
+
+                            temp_buf = []
+                            for _ in range(0x400 if self.cNandSize.Selection == 1 else 0x100):
+                                temp_buf.append(self.cmd_read_u16(const._platforms[self.cChipset.Selection]["flash_buffer"]))
+                                cOffset += 2
+                                
+                                if cOffset >= eOffset: break
+                                
+                            tempFile.write(b"".join([x.to_bytes(2, "big" if self.cTarget.Selection >= self._beTarget else "little") for x in temp_buf]))
+                            if cOffset >= eOffset: break
+                        
+                        elif const._platforms[self.cChipset.Selection]["reg_width"] == 2:
+                            if self.cNandSize.Selection == 1:
+                                self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_cmd"], 0x00)
+                                
+                                self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
+                                self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 8) & 0xf)
+                                
+                                self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 11) & 0xff)
+                                self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 11) >> 8) & 0xff)
+                                self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 11) >> 16) & 0xff)
+                                
+                                self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_cmd"], 0x30)
+                            
+                            else:
+                                self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_cmd"], (cOffset >> 8) & 1)
+                                
+                                self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
+                                
+                                self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 9) & 0xff)
+                                self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 9) >> 8) & 0xff)                                    
+                                self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 9) >> 16) & 0xff)                                    
+
+                            for _ in range(0x2500):
+                                _msleep(const._jtag_sleep_delay)
+                                if const._platforms[self.cChipset.Selection]["wait_mask"] is not None:
+                                    if self.cmd_read_u32(const._platforms[self.cChipset.Selection]["flash_wait"]) & const._platforms[self.cChipset.Selection]["wait_mask"]: break                                    
+                                    
+                            temp_buf = []
+                            for _ in range(0x400 if self.cNandSize.Selection == 1 else 0x100):
+                                temp_buf.append(self.cmd_read_u16(const._platforms[self.cChipset.Selection]["flash_buffer"]))
+                                cOffset += 2
+                                
+                                if cOffset >= eOffset: break
+                                
+                            tempFile.write(b"".join([x.to_bytes(2, "big" if self.cTarget.Selection >= self._beTarget else "little") for x in temp_buf]))
+                            if cOffset >= eOffset: break
+                        
+                        elif const._platforms[self.cChipset.Selection]["reg_width"] == 4:
+                            if self.cNandSize.Selection == 1:
+                                self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_cmd"], 0x00)
+                                
+                                self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
+                                self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 8) & 0xf)
+                                
+                                self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 11) & 0xff)
+                                self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 11) >> 8) & 0xff)
+                                self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 11) >> 16) & 0xff)
+                                
+                                self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_cmd"], 0x30)
+                            
+                            else:
+                                self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_cmd"], (cOffset >> 8) & 1)
+                                
+                                self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
+                                
+                                self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 9) & 0xff)
+                                self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 9) >> 8) & 0xff)                                    
+                                self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 9) >> 16) & 0xff)                                    
+
+                            for _ in range(0x2500):
+                                _msleep(const._jtag_sleep_delay)
+                                if const._platforms[self.cChipset.Selection]["wait_mask"] is not None:
+                                    if self.cmd_read_u32(const._platforms[self.cChipset.Selection]["flash_wait"]) & const._platforms[self.cChipset.Selection]["wait_mask"]: break                                    
+                                    
+                            temp_buf = []
+                            for _ in range(0x400 if self.cNandSize.Selection == 1 else 0x100):
+                                temp_buf.append(self.cmd_read_u32(const._platforms[self.cChipset.Selection]["flash_buffer"]))
+                                cOffset += 2
+                                
+                                if cOffset >= eOffset: break
+                                
+                            tempFile.write(b"".join([x.to_bytes(2, "big" if self.cTarget.Selection >= self._beTarget else "little") for x in temp_buf]))
+                            if cOffset >= eOffset: break
+                    
+                    elif const._platforms[self.cChipset.Selection]["mode"] == 6:
+                        raise NotImplementedError()
+                    
+                    elif const._platforms[self.cChipset.Selection]["mode"] == 7:
+                        O1N_BASE = int(const._platforms[self.cChipset.Selection]["o1n_offset"], 16)
+                        
+                        self.cmd_write_u16(O1N_BASE + 0x1E202, 0x8000 if False else 0x0)
+                        self.cmd_write_u16(O1N_BASE + 0x1E200, (0x8000 if False else 0x0) | ((cOffset >> 17) & 0x7fff))
+                        self.cmd_write_u16(O1N_BASE + 0x1E20E, (cOffset >> 9) & 0x3f)
+                        
+                        self.cmd_write_u16(O1N_BASE + 0x1E400, 0x800)
+
+                        if self.bECCDisable.Value:
+                            self.cmd_write_u16(O1N_BASE + 0x1E442, self.cmd_read_u16(O1N_BASE + 0x1E442) | (1 << 8))
+
+                        else:
+                            self.cmd_write_u16(O1N_BASE + 0x1E442, self.cmd_read_u16(O1N_BASE + 0x1E442) & 0xfeff)
+                    
+                        self.cmd_write_u16(O1N_BASE + 0x1E482, 0)
+                        self.cmd_write_u16(O1N_BASE + 0x1E440, 0)
+                    
+                        for _ in range(0x2500):
+                            _msleep(const._jtag_sleep_delay)
+                            if self.cmd_read_u16(O1N_BASE + 0x1E482) & 0x8000: break
+                            
+                        for x in range(8 if self.cNandSize.Selection == 1 else 4):
+                            tempFile.write(self.cmd_read_u8(O1N_BASE + 0x400 + (0x200 * x), 0x200))
+                            spareBuf += self.cmd_read_u8(O1N_BASE + 0x10020 + (0x10 * x), 0x10)
+                            
+                            cOffset += 0x200
+                            if cOffset >= eOffset: break   
+                                        
+                    self._progMsgQueue.put(cOffset/eOffset)
+                                        
+                tempFile.write(spareBuf + bbBuf)
+                #tempFile.write() # TODO: Write Dumpit Device Footer format
+
+        except Exception as e:
+            traceback.print_exc()
+            self._errMsgQueue.put(str(e))
+
+        finally:            
+            self._logThreadQueue.queue.clear()
+            time.sleep(1)
+            self._btnMsgQueue.put(False)
+            self._isRead = False
+            self._isReadCanceled = False
                         
     def doReadFlash( self, event ):
-        if not self._isConnect and not self._isConnectRemote: return
+        if (not self._isConnect and not self._isConnectRemote) or self._isRead: return
         
         cOffset = int(self.tStart.Value, 16)
         eOffset = int(self.tEnd.Value, 16)
         
+        if cOffset >= eOffset:
+            return wx.MessageBox(f"start offset must be less than end offset", "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
+        
         if (cOffset % (0x800 if self.cNandSize.Selection == 1 else 0x200)) != 0 or (eOffset % (0x800 if self.cNandSize.Selection == 1 else 0x200)) != 0:
-            return wx.MessageBox(f"offset not divisible by {hex(0x800 if self.cNandSize.Selection == 1 else 0x200)} is unimplemented", "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
+            return wx.MessageBox(f"offset not divisible by {hex(0x800 if self.cNandSize.Selection == 1 else 0x200)} is not supported", "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
         
         with wx.FileDialog(self, "Dump flash", wildcard="Binary file|*.bin", style=wx.FD_SAVE) as fd:
             fd: wx.FileDialog
             if fd.ShowModal() != wx.ID_CANCEL:                    
-                spareBuf = bytearray()
+                self.progress.Value = 0                
                 
-                self._isRead = True
-                    
-                try:                    
-                    if const._platforms[self.cChipset.Selection]["mode"] in [1, 2]:
-                        self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 7)                    
-                        _msleep(25000)
-
-                        if self.bECCDisable.Value:
-                            self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg"], 16), self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg"], 16)) | 1)
-
-                        else:
-                            self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg"], 16), self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg"], 16)) & 0xfffffffe)
-                                                        
-                    elif const._platforms[self.cChipset.Selection]["mode"] == 3:
-                        self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 0x31)
-                        self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_exec_cmd"], 16), 1)
-                        _msleep(25000)
-                        
-                        self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 0xD)
-                        self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_exec_cmd"], 16), 1)
-                        _msleep(25000)
-
-                        if self.bECCDisable.Value:
-                            self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16), (self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16)) | 1) | (1 << 1))
-
-                        else:
-                            self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16), (self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16)) & 0xfffffffe) | (1 << 1))
-
-                    elif const._platforms[self.cChipset.Selection]["mode"] == 5:
-                        if const._platforms[self.cChipset.Selection]["reg_width"] in [0, 1]:
-                            self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_cmd"], 0xff)                                        
-                        
-                        elif const._platforms[self.cChipset.Selection]["reg_width"] == 2:
-                            self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_cmd"], 0xff)
-                                                
-                        elif const._platforms[self.cChipset.Selection]["reg_width"] == 4:
-                            self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_cmd"], 0xff)
-                            
-                        _msleep(25000)
-                                                
-                    with open(fd.GetPath(), "wb") as tempFile:
-                        while cOffset < eOffset:
-                            if const._platforms[self.cChipset.Selection]["mode"] == 1:
-                                self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_addr"], 16), cOffset)
-                                
-                                for _ in range(4 if self.cNandSize.Selection == 1 else 1):
-                                    self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 1)
-                                    
-                                    for _ in range(0x2500):
-                                        _msleep(const._jtag_sleep_delay)
-                                        if self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_wait_status"], 16)) & 8192: break
-                                    
-                                    tempFile.write(self.cmd_read_u8(int(const._platforms[self.cChipset.Selection]["flash_buffer"], 16), 0x200))
-                                    
-                                    spareBuf += self.cmd_read_u8(int(const._platforms[self.cChipset.Selection]["flash_buffer"], 16) + 0x200, 0x10)
-                                    
-                                    cOffset += 0x200 
-                                    if cOffset >= eOffset: break    
-                                    
-                            elif const._platforms[self.cChipset.Selection]["mode"] == 2:
-                                self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_addr"], 16), cOffset)
-                                
-                                for _ in range(4 if self.cNandSize.Selection == 1 else 1):
-                                    self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 1)
-                                    
-                                    for _ in range(0x2500):
-                                        _msleep(const._jtag_sleep_delay)
-                                        if self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_wait_status"], 16)) & 2: break
-                                    
-                                    tempFile.write(self.cmd_read_u8(int(const._platforms[self.cChipset.Selection]["flash_buffer"], 16), 0x200))
-                                    
-                                    spareBuf += self.cmd_read_u8(int(const._platforms[self.cChipset.Selection]["flash_buffer"], 16) + 0x200, 0x10)
-                                    
-                                    cOffset += 0x200    
-                                    if cOffset >= eOffset: break   
-                        
-                            elif const._platforms[self.cChipset.Selection]["mode"] == 3:
-                                self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 0x34)
-                                
-                                flash_write = ((cOffset >> 11) << 16) | ((cOffset >> 1) & 0x3ff) if self.cNandSize.Selection == 1 else ((cOffset >> 9) << 8) | ((cOffset >> 1) & 0xff)
-                                
-                                self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_addr0"], 16), flash_write & 0xffffffff)
-                                self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_addr1"], 16), (flash_write >> 32) & 0xffffffff)
-                                
-                                for _ in range(4 if self.cNandSize.Selection == 1 else 1):
-                                    self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_exec_cmd"], 16), 1)
-                                    
-                                    for _ in range(0x2500):
-                                        _msleep(const._jtag_sleep_delay)
-                                        if (self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_status"], 16)) & 0xf) == 0: break
-                                    
-                                    tempChunk = self.cmd_read_u8(int(const._platforms[self.cChipset.Selection]["flash_buffer"], 16), 0x210)
-                                    
-                                    if self.bBadBlockinData:
-                                        tempFile.write(tempChunk[:0x1d0] + tempChunk[0x1d2:0x202])
-                                        spareBuf += tempChunk[0x202:] + b"\xff\xff"
-                                        
-                                    else:
-                                        tempFile.write(tempChunk[:0x200])
-                                        spareBuf += tempChunk[0x200:]
-                                    
-                                    cOffset += 0x200      
-                                    if cOffset >= eOffset: break
-                        
-                            elif const._platforms[self.cChipset.Selection]["mode"] == 4:
-                                tempFile.write(self.cmd_read_u8(cOffset, 0x200))
-                                cOffset += 0x200
-                                
-                            elif const._platforms[self.cChipset.Selection]["mode"] == 5:
-                                if const._platforms[self.cChipset.Selection]["reg_width"] == 0:
-                                    if self.cNandSize.Selection == 1:
-                                        self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_cmd"], 0x00)
-                                        
-                                        self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
-                                        self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 8) & 0xf)
-                                        
-                                        self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 11) & 0xff)
-                                        self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 11) >> 8) & 0xff)
-                                        self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 11) >> 16) & 0xff)
-                                        
-                                        self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_cmd"], 0x30)
-                                    
-                                    else:
-                                        self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_cmd"], (cOffset >> 8) & 1)
-                                        
-                                        self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
-                                        
-                                        self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 9) & 0xff)
-                                        self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 9) >> 8) & 0xff)                                    
-                                        self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 9) >> 16) & 0xff)                                    
-                                        
-                                    for _ in range(0x2500):
-                                        _msleep(const._jtag_sleep_delay)
-                                        if const._platforms[self.cChipset.Selection]["wait_mask"] is not None:
-                                            if self.cmd_read_u32(const._platforms[self.cChipset.Selection]["flash_wait"]) & const._platforms[self.cChipset.Selection]["wait_mask"]: break                                    
-                                
-                                    temp_buf = []
-                                    for _ in range(0x800 if self.cNandSize.Selection == 1 else 0x200):
-                                        temp_buf.append(self.cmd_read_u8(const._platforms[self.cChipset.Selection]["flash_buffer"]))
-                                        cOffset += 1
-                                        
-                                        if cOffset >= eOffset: break
-                                        
-                                    tempFile.write(bytes(temp_buf))
-                                    if cOffset >= eOffset: break
-                                
-                                elif const._platforms[self.cChipset.Selection]["reg_width"] == 1:
-                                    self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_cmd"], 0)
-                                        
-                                    self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 1) & 0xff)
-                                    
-                                    self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 9) & 0xff)
-                                    self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 9) >> 8) & 0xff)                                    
-                                    self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 9) >> 16) & 0xff)                                    
-                                    
-                                    for _ in range(0x2500):
-                                        _msleep(const._jtag_sleep_delay)
-                                        if const._platforms[self.cChipset.Selection]["wait_mask"] is not None:
-                                            if self.cmd_read_u32(const._platforms[self.cChipset.Selection]["flash_wait"]) & const._platforms[self.cChipset.Selection]["wait_mask"]: break                                    
-
-                                    temp_buf = []
-                                    for _ in range(0x400 if self.cNandSize.Selection == 1 else 0x100):
-                                        temp_buf.append(self.cmd_read_u16(const._platforms[self.cChipset.Selection]["flash_buffer"]))
-                                        cOffset += 2
-                                        
-                                        if cOffset >= eOffset: break
-                                        
-                                    tempFile.write(b"".join([x.to_bytes(2, "big" if self.cTarget.Selection >= self._beTarget else "little") for x in temp_buf]))
-                                    if cOffset >= eOffset: break
-                                
-                                elif const._platforms[self.cChipset.Selection]["reg_width"] == 2:
-                                    if self.cNandSize.Selection == 1:
-                                        self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_cmd"], 0x00)
-                                        
-                                        self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
-                                        self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 8) & 0xf)
-                                        
-                                        self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 11) & 0xff)
-                                        self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 11) >> 8) & 0xff)
-                                        self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 11) >> 16) & 0xff)
-                                        
-                                        self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_cmd"], 0x30)
-                                    
-                                    else:
-                                        self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_cmd"], (cOffset >> 8) & 1)
-                                        
-                                        self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
-                                        
-                                        self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 9) & 0xff)
-                                        self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 9) >> 8) & 0xff)                                    
-                                        self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 9) >> 16) & 0xff)                                    
-
-                                    for _ in range(0x2500):
-                                        _msleep(const._jtag_sleep_delay)
-                                        if const._platforms[self.cChipset.Selection]["wait_mask"] is not None:
-                                            if self.cmd_read_u32(const._platforms[self.cChipset.Selection]["flash_wait"]) & const._platforms[self.cChipset.Selection]["wait_mask"]: break                                    
-                                            
-                                    temp_buf = []
-                                    for _ in range(0x400 if self.cNandSize.Selection == 1 else 0x100):
-                                        temp_buf.append(self.cmd_read_u16(const._platforms[self.cChipset.Selection]["flash_buffer"]))
-                                        cOffset += 2
-                                        
-                                        if cOffset >= eOffset: break
-                                        
-                                    tempFile.write(b"".join([x.to_bytes(2, "big" if self.cTarget.Selection >= self._beTarget else "little") for x in temp_buf]))
-                                    if cOffset >= eOffset: break
-                                
-                                elif const._platforms[self.cChipset.Selection]["reg_width"] == 4:
-                                    if self.cNandSize.Selection == 1:
-                                        self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_cmd"], 0x00)
-                                        
-                                        self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
-                                        self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 8) & 0xf)
-                                        
-                                        self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 11) & 0xff)
-                                        self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 11) >> 8) & 0xff)
-                                        self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 11) >> 16) & 0xff)
-                                        
-                                        self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_cmd"], 0x30)
-                                    
-                                    else:
-                                        self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_cmd"], (cOffset >> 8) & 1)
-                                        
-                                        self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
-                                        
-                                        self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 9) & 0xff)
-                                        self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 9) >> 8) & 0xff)                                    
-                                        self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], ((cOffset >> 9) >> 16) & 0xff)                                    
-
-                                    for _ in range(0x2500):
-                                        _msleep(const._jtag_sleep_delay)
-                                        if const._platforms[self.cChipset.Selection]["wait_mask"] is not None:
-                                            if self.cmd_read_u32(const._platforms[self.cChipset.Selection]["flash_wait"]) & const._platforms[self.cChipset.Selection]["wait_mask"]: break                                    
-                                            
-                                    temp_buf = []
-                                    for _ in range(0x400 if self.cNandSize.Selection == 1 else 0x100):
-                                        temp_buf.append(self.cmd_read_u32(const._platforms[self.cChipset.Selection]["flash_buffer"]))
-                                        cOffset += 2
-                                        
-                                        if cOffset >= eOffset: break
-                                        
-                                    tempFile.write(b"".join([x.to_bytes(2, "big" if self.cTarget.Selection >= self._beTarget else "little") for x in temp_buf]))
-                                    if cOffset >= eOffset: break
-                            
-                            elif const._platforms[self.cChipset.Selection]["mode"] == 6:
-                                raise NotImplementedError()
-                            
-                            elif const._platforms[self.cChipset.Selection]["mode"] == 7:
-                                O1N_BASE = int(const._platforms[self.cChipset.Selection]["o1n_offset"], 16)
-                                
-                                self.cmd_write_u16(O1N_BASE + 0x1E202, 0x8000 if False else 0x0)
-                                self.cmd_write_u16(O1N_BASE + 0x1E200, (0x8000 if False else 0x0) | ((cOffset >> 17) & 0x7fff))
-                                self.cmd_write_u16(O1N_BASE + 0x1E20E, (cOffset >> 9) & 0x3f)
-                                
-                                self.cmd_write_u16(O1N_BASE + 0x1E400, 0x800)
-
-                                if self.bECCDisable.Value:
-                                    self.cmd_write_u16(O1N_BASE + 0x1E442, self.cmd_read_u16(O1N_BASE + 0x1E442) | (1 << 8))
-
-                                else:
-                                    self.cmd_write_u16(O1N_BASE + 0x1E442, self.cmd_read_u16(O1N_BASE + 0x1E442) & 0xfeff)
-                            
-                                self.cmd_write_u16(O1N_BASE + 0x1E482, 0)
-                                self.cmd_write_u16(O1N_BASE + 0x1E440, 0)
-                            
-                                for _ in range(0x2500):
-                                    _msleep(const._jtag_sleep_delay)
-                                    if self.cmd_read_u16(O1N_BASE + 0x1E482) & 0x8000: break
-                                    
-                                for x in range(8 if self.cNandSize.Selection == 1 else 4):
-                                    tempFile.write(self.cmd_read_u8(O1N_BASE + 0x400 + (0x200 * x), 0x200))
-                                    spareBuf += self.cmd_read_u8(O1N_BASE + 0x10020 + (0x10 * x), 0x10)
-                                    
-                                    cOffset += 0x200
-                                    if cOffset >= eOffset: break   
-                                                
-                        if const._platforms[self.cChipset.Selection]["mode"] != 4: tempFile.write(spareBuf)
-                        #tempFile.write() # TODO: Write Dumpit Device Footer format
-
-                except Exception as e:
-                    traceback.print_exc()
-                    wx.MessageBox(str(e), "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
-
-                finally:
-                    self._isRead = False
-
+                self._dumpThread = threading.Thread(target=self.doReadFlashThread, args=(fd.GetPath(), cOffset, eOffset))
+                self._dumpThread.daemon = True
+                
+                self._dumpThread.start()
+                
     def doStop( self, event ):
-        event.Skip()
+        self._isReadCanceled = True
+        self.bStop.Enable(False)
 
     def doGo( self, event ):
         if not self._isConnect and not self._isConnectRemote: return
@@ -1070,7 +1194,14 @@ class MainApp(main.main):
         event.Skip()
 
     def doDisableMMU( self, event ):
-        event.Skip()
+        if not self._isConnect and not self._isConnectRemote: return
+        cp15 = self.cmd_read_cp15(1, 0, 0, 0)
+        self.cmd_write_cp15(1, 0, 0, 0, cp15 & 0xfffffffe)
+        
+    def doEnableMMU( self, event ):
+        if not self._isConnect and not self._isConnectRemote: return
+        cp15 = self.cmd_read_cp15(1, 0, 0, 0)
+        self.cmd_write_cp15(1, 0, 0, 0, cp15 | 1)
 
     def doExecAddress( self, event ):
         if not self._isConnect and not self._isConnectRemote: return
@@ -1103,6 +1234,7 @@ class MainApp(main.main):
         FT232HConfig(self).ShowModal()
         
     def doIDCODE( self, event ):
+        if self._isConnect or self._isConnectRemote: return
         self.finderStatus.Value = ""        
         
         try:
@@ -1132,6 +1264,7 @@ class MainApp(main.main):
             wx.MessageBox(str(e), "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
 
     def doBYPASS( self, event ):
+        if self._isConnect or self._isConnectRemote: return
         self.finderStatus.Value = ""
         
         try:
@@ -1163,6 +1296,7 @@ class MainApp(main.main):
             wx.MessageBox(str(e), "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
 
     def doRTCK( self, event ):
+        if self._isConnect or self._isConnectRemote: return
         self.finderStatus.Value = ""
         
         try:
@@ -1189,7 +1323,17 @@ class MainApp(main.main):
             wx.MessageBox(str(e), "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
 
     def doQuit(self, event: wx.CloseEvent):
-        if wx.MessageBox("Exit Dumpit?", "Dumpit", wx.YES_NO|wx.CENTER|wx.ICON_QUESTION, self) == wx.YES:        
+        if wx.MessageBox("Exit Dumpit?", "Dumpit", wx.YES_NO|wx.CENTER|wx.ICON_QUESTION, self) == wx.YES:  
+            if self._isConnect:
+                self._isConnect = False            
+                self._ocd.terminate()                         
+                
+            elif self._isConnectRemote:            
+                self._isConnectRemote = False            
+                if self._sio and self._sio.connected: 
+                    self._sio.emit("bye") 
+                    self._sio.disconnect()
+                  
             cfg = {}
             
             cfg["interface"] = self.cInterface.Selection
@@ -1232,9 +1376,16 @@ class MainApp(main.main):
             
             json.dump(cfg, open(os.path.join(os.path.dirname(__file__), "dumpit_config.json"), "w"), indent=4)            
             event.Skip()
+            
+    def doOCDCmdExec(self, event):
+        temp = self.tOCDCmd.Value
+        self.tOCDCmd.Value = ""
+        if not self._isConnect and not self._isConnectRemote: return
+        
+        self._ocdSendCommand(temp)
 
 def getInitCmd(self: MainApp):    
-    cInit = const._interfaces[self.cInterface.Selection][1].replace('(FT232R_VID)', self.tUSBID.Value.split(':')[0]).replace('(FT232R_PID)', self.tUSBID.Value.split(':')[1]).replace('(FT232R_RESTORE_SERIAL)', self.tRestoreSerial.Value).replace('(FT232H_VID)', self.tUSBID1.Value.split(':')[0]).replace('(FT232H_PID)', self.tUSBID1.Value.split(':')[1]).replace('(FT232H_CHANNEL)', str(self.cChannel.Selection)).replace('(FT232H_EDGE)', ['rising', 'falling'][self.rSamplingEdge.Selection]).replace('(FT232H_PINS)', hex(self._ft232h_pins)).replace('(FT232H_DIR)', hex(self._ft232h_dirs)).replace('(FT232H_LAYOUT_SIGNAL)', f'ftdi layout_signal nTRST -data {hex(1 << self._ft232h_trst)} -oe {hex(1 << self._ft232h_trst)}; ftdi layout_signal nSRST -data {hex(1 << self._ft232h_srst)} -oe {hex(1 << self._ft232h_srst)}; ftdi layout_signal TDI -data {hex(1 << self._ft232h_tdi)}; ftdi layout_signal TDO -data {hex(1 << self._ft232h_tdo)} -oe {hex(1 << self._ft232h_tdo)}; ftdi layout_signal TCK -data {hex(1 << self._ft232h_tck)}; ftdi layout_signal TMS -data {hex(1 << self._ft232h_tms)}')
+    cInit = const._interfaces[self.cInterface.Selection][1].replace('(FT232R_VID)', self.tUSBID.Value.split(':')[0]).replace('(FT232R_PID)', self.tUSBID.Value.split(':')[1]).replace('(FT232R_RESTORE_SERIAL)', self.tRestoreSerial.Value).replace('(FT232H_VID)', self.tUSBID1.Value.split(':')[0]).replace('(FT232H_PID)', self.tUSBID1.Value.split(':')[1]).replace('(FT232H_CHANNEL)', str(self.cChannel.Selection)).replace('(FT232H_EDGE)', ['rising', 'falling'][self.rSamplingEdge.Selection]).replace('(FT232H_PINS)', hex(self._ft232h_pins)).replace('(FT232H_DIR)', hex(self._ft232h_dirs)).replace('(FT232H_LAYOUT_SIGNAL)', f'ftdi layout_signal nTRST -data {hex(1 << self._ft232h_trst)} -oe {hex(1 << self._ft232h_trst)}; ftdi layout_signal nSRST -data {hex(1 << self._ft232h_srst)} -oe {hex(1 << self._ft232h_srst)}; ftdi layout_signal TDI -data {hex(1 << self._ft232h_tdi)}; ftdi layout_signal TDO -data {hex(1 << self._ft232h_tdo)} -oe {hex(1 << self._ft232h_tdo)}; ftdi layout_signal TCK -data {hex(1 << self._ft232h_tck)}; ftdi layout_signal TMS -data {hex(1 << self._ft232h_tms)}').replace("(FT232R_PINS)", "")
             
     INIT_CMD = f"{cInit} telnet_port 0; gdb_port 0; tcl_port pipe; reset_config {const._reset_type[self.cResetMode.Selection][1]}; jtag_ntrst_delay {self._resetDelays[self.cResetDelay.Selection][0]}; adapter srst delay {self._resetDelays[self.cResetDelay.Selection][1]}; "
     
