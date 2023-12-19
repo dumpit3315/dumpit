@@ -859,6 +859,9 @@ class MainApp(main.main):
         self._isRead = True
         self._isReadCanceled = False
         
+        O1N_isDDP = False
+        O1N_Density = 0
+        
         self._btnMsgQueue.put(True)
             
         try:                    
@@ -898,6 +901,13 @@ class MainApp(main.main):
                     self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_cmd"], 0xff)
                     
                 _msleep(const._jtag_init_delay)
+                
+            elif const._platforms[self.cChipset.Selection]["mode"] == 7:
+                O1N_BASE = int(const._platforms[self.cChipset.Selection]["o1n_offset"], 16)
+                O1N_DevID = self.cmd_read_u16(O1N_BASE + 0x1E002)
+                        
+                O1N_isDDP = bool(O1N_DevID & 8)
+                O1N_Density = 2 << ((5 if O1N_isDDP else 6) + ((O1N_DevID >> 4) & 0xf))
                                         
             with open(name, "wb") as tempFile:
                 while cOffset < eOffset and not self._isReadCanceled:
@@ -1110,9 +1120,9 @@ class MainApp(main.main):
                     elif const._platforms[self.cChipset.Selection]["mode"] == 7:
                         O1N_BASE = int(const._platforms[self.cChipset.Selection]["o1n_offset"], 16)
                         
-                        self.cmd_write_u16(O1N_BASE + 0x1E202, 0x8000 if False else 0x0)
-                        self.cmd_write_u16(O1N_BASE + 0x1E200, (0x8000 if False else 0x0) | ((cOffset >> 17) & 0x7fff))
-                        self.cmd_write_u16(O1N_BASE + 0x1E20E, (cOffset >> 9) & 0x3f)
+                        self.cmd_write_u16(O1N_BASE + 0x1E202, 0x8000 if O1N_isDDP and (cOffset >> 17) >= O1N_Density else 0x0)
+                        self.cmd_write_u16(O1N_BASE + 0x1E200, (0x8000 if O1N_isDDP and (cOffset >> 17) >= O1N_Density else 0x0) | ((cOffset >> 17) & (O1N_Density - 1)))
+                        self.cmd_write_u16(O1N_BASE + 0x1E20E, (cOffset >> 9) & 0xff)
                         
                         self.cmd_write_u16(O1N_BASE + 0x1E400, 0x800)
 
@@ -1161,8 +1171,10 @@ class MainApp(main.main):
         if cOffset >= eOffset:
             return wx.MessageBox(f"start offset must be less than end offset", "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
         
-        if (cOffset % (0x800 if self.cNandSize.Selection == 1 else 0x200)) != 0 or (eOffset % (0x800 if self.cNandSize.Selection == 1 else 0x200)) != 0:
-            return wx.MessageBox(f"offset not divisible by {hex(0x800 if self.cNandSize.Selection == 1 else 0x200)} is not supported", "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
+        flash_div = (0x800 if self.cNandSize.Selection == 1 else 0x200) if const._platforms[self.cChipset.Selection]["mode"] != 7 else (0x1000 if self.cNandSize.Selection == 1 else 0x800)
+        
+        if (cOffset % flash_div) != 0 or (eOffset % flash_div) != 0:
+            return wx.MessageBox(f"offset not divisible by {hex(flash_div)} is not supported", "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
         
         with wx.FileDialog(self, "Dump flash", wildcard="Binary file|*.bin", style=wx.FD_SAVE) as fd:
             fd: wx.FileDialog
