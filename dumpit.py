@@ -862,6 +862,8 @@ class MainApp(main.main):
         O1N_isDDP = False
         O1N_Density = 0
         
+        QSC_NAND_CFG1 = 0
+        
         self._btnMsgQueue.put(True)
             
         try:                    
@@ -885,11 +887,14 @@ class MainApp(main.main):
                 _msleep(const._jtag_init_delay)
 
                 if self.bECCDisable.Value:
-                    self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16), (self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16)) | 1) | (1 << 1))
+                    self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16), self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16)) | 1)
 
                 else:
-                    self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16), (self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16)) & 0xfffffffe) | (1 << 1))
-
+                    self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16), self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16)) & 0xfffffffe)
+                    
+                _msleep(const._jtag_init_delay)
+                QSC_NAND_CFG1 = self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16))
+                    
             elif const._platforms[self.cChipset.Selection]["mode"] == 5:
                 if const._platforms[self.cChipset.Selection]["reg_width"] in [0, 1]:
                     self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_cmd"], 0xff)                                        
@@ -948,7 +953,7 @@ class MainApp(main.main):
                     elif const._platforms[self.cChipset.Selection]["mode"] == 3:
                         self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 0x34)
                         
-                        flash_write = ((cOffset >> 11) << 16) | ((cOffset >> 1) & 0x3ff) if self.cNandSize.Selection == 1 else ((cOffset >> 9) << 8) | ((cOffset >> 1) & 0xff)
+                        flash_write = ((cOffset >> 11) << 16) | (((cOffset >> 1) & 0x3ff) if QSC_NAND_CFG1 & 2 else (cOffset & 0x7ff)) if self.cNandSize.Selection == 1 else ((cOffset >> 9) << 8) | ((cOffset >> 1) & 0xff)
                         
                         self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_addr0"], 16), flash_write & 0xffffffff)
                         self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_addr1"], 16), (flash_write >> 32) & 0xffffffff)
