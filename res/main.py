@@ -162,10 +162,10 @@ class main ( wx.Frame ):
 		bSizer6111.Add( self.cNandSize, 1, wx.ALL, 5 )
 
 		self.bECCDisable = wx.CheckBox( self.dPage1, wx.ID_ANY, u"Disable ECC", wx.DefaultPosition, wx.DefaultSize, 0 )
-		bSizer6111.Add( self.bECCDisable, 0, wx.ALL, 5 )
+		bSizer6111.Add( self.bECCDisable, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 		self.bBadBlockinData = wx.CheckBox( self.dPage1, wx.ID_ANY, u"Bad Blocks on Data", wx.DefaultPosition, wx.DefaultSize, 0 )
-		bSizer6111.Add( self.bBadBlockinData, 0, wx.ALL, 5 )
+		bSizer6111.Add( self.bBadBlockinData, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 
 		bSizer5.Add( bSizer6111, 0, wx.EXPAND, 5 )
@@ -188,6 +188,11 @@ class main ( wx.Frame ):
 
 		self.bTargetRemote = wx.TextCtrl( self.dPage1, wx.ID_ANY, u"dumpit.ucomsite.my.id", wx.DefaultPosition, wx.DefaultSize, 0 )
 		bSizer611112.Add( self.bTargetRemote, 1, wx.ALL, 5 )
+
+		self.bUseGDB = wx.CheckBox( self.dPage1, wx.ID_ANY, u"Use GDB", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.bUseGDB.Enable( False )
+
+		bSizer611112.Add( self.bUseGDB, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 
 		bSizer5.Add( bSizer611112, 0, wx.EXPAND, 5 )
@@ -223,6 +228,11 @@ class main ( wx.Frame ):
 		self.bExecScript.Enable( False )
 
 		bSizer611111.Add( self.bExecScript, 1, wx.ALL, 5 )
+
+		self.bExecLoader = wx.Button( self.dPage1, wx.ID_ANY, u"Execute Loader", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.bExecLoader.Enable( False )
+
+		bSizer611111.Add( self.bExecLoader, 1, wx.ALL, 5 )
 
 
 		bSizer5.Add( bSizer611111, 0, wx.EXPAND, 5 )
@@ -406,6 +416,37 @@ class main ( wx.Frame ):
 		self.dPage3.Layout()
 		bSizer56.Fit( self.dPage3 )
 		self.tab.AddPage( self.dPage3, u"JTAG Finder (FTDI only)", False )
+		self.dPage4 = wx.Panel( self.tab, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
+		bSizer44 = wx.BoxSizer( wx.VERTICAL )
+
+		bSizer45 = wx.BoxSizer( wx.HORIZONTAL )
+
+		self.bEnableAnalytics = wx.CheckBox( self.dPage4, wx.ID_ANY, u"Enable Analytics", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.bEnableAnalytics.SetValue(True)
+		bSizer45.Add( self.bEnableAnalytics, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+		self.lUserID = wx.StaticText( self.dPage4, wx.ID_ANY, u"User ID:", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.lUserID.Wrap( -1 )
+
+		bSizer45.Add( self.lUserID, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+		self.tUserID = wx.TextCtrl( self.dPage4, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, wx.TE_READONLY )
+		bSizer45.Add( self.tUserID, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+		self.bRegenUID = wx.Button( self.dPage4, wx.ID_ANY, u"Regenerate", wx.DefaultPosition, wx.DefaultSize, 0 )
+		bSizer45.Add( self.bRegenUID, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+
+		bSizer44.Add( bSizer45, 0, wx.EXPAND, 5 )
+
+		self.analytics_stat = wx.richtext.RichTextCtrl( self.dPage4, wx.ID_ANY, u"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean ac libero vel massa tristique ullamcorper ac et quam. Nunc ultricies dui nibh, ac auctor augue pulvinar sit amet. Nulla malesuada, arcu eu aliquet semper, leo est tincidunt ante, id aliquet tortor leo vel ex. Suspendisse orci lorem, molestie in auctor in, lacinia a felis. Nam molestie sagittis rutrum. Pellentesque tellus mi, posuere sed bibendum quis, laoreet a dui. In vehicula feugiat est, sit amet pellentesque neque porta sit amet. Nam in elit malesuada, imperdiet dolor eu, maximus elit.\n\nDuis tincidunt ante at massa ornare, in vehicula dolor bibendum. Integer eu est interdum, malesuada ex id, rhoncus lectus. Nullam elementum orci in tellus vestibulum porttitor. Etiam vel lectus aliquet, iaculis erat ac, convallis tortor. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Sed bibendum ultrices tempus. Cras diam felis, sodales a lacinia non, rutrum sit amet nisl. Cras dapibus, ex vitae fringilla convallis, mi lacus faucibus lorem, a aliquam ligula orci in quam. Fusce eu erat maximus, volutpat mauris quis, egestas dolor.\n\nPellentesque elementum ultrices dignissim. Integer bibendum elementum auctor. Nulla facilisi. Integer tristique bibendum facilisis. Morbi id risus molestie, tempor diam non, dignissim mauris. In sit amet orci id tellus fringilla cursus. Nam rhoncus lectus a nibh congue, at fermentum elit accumsan. Proin congue nunc velit, at tempor arcu vulputate vitae. Aenean ac diam quis neque gravida ullamcorper. Pellentesque ac erat ex.\n\nMauris lectus risus, consequat quis eros vitae, feugiat fermentum purus. Aenean risus ipsum, dignissim quis consectetur hendrerit, ultrices sed velit. Duis maximus massa tellus, at blandit elit fringilla nec. Ut luctus facilisis mi, non vehicula lorem sagittis vel. Morbi gravida lacus eu sapien condimentum gravida. Vestibulum consectetur auctor est ac efficitur. Aliquam aliquam commodo nibh. Proin ultricies porttitor arcu id accumsan. Maecenas quam eros, egestas vitae fermentum laoreet, efficitur at lacus.\n\nCurabitur id erat eu sapien volutpat ullamcorper. Nulla volutpat dignissim varius. Duis vulputate imperdiet tincidunt. Aenean in leo feugiat, rhoncus erat quis, sollicitudin sapien. Vivamus imperdiet turpis sit amet velit tristique, in dictum dolor pharetra. Duis efficitur magna nec hendrerit congue. In vel luctus purus. ", wx.DefaultPosition, wx.DefaultSize, wx.TE_READONLY|wx.VSCROLL|wx.HSCROLL|wx.NO_BORDER|wx.WANTS_CHARS )
+		bSizer44.Add( self.analytics_stat, 1, wx.EXPAND |wx.ALL, 5 )
+
+
+		self.dPage4.SetSizer( bSizer44 )
+		self.dPage4.Layout()
+		bSizer44.Fit( self.dPage4 )
+		self.tab.AddPage( self.dPage4, u"Analytics", False )
 
 		bSizer3.Add( self.tab, 1, wx.EXPAND |wx.ALL, 5 )
 
@@ -438,6 +479,7 @@ class main ( wx.Frame ):
 		self.bHalt.Bind( wx.EVT_BUTTON, self.doHalt )
 		self.bReset.Bind( wx.EVT_BUTTON, self.doReset )
 		self.bExecScript.Bind( wx.EVT_BUTTON, self.doScript )
+		self.bExecLoader.Bind( wx.EVT_BUTTON, self.doLoader )
 		self.bEnableMMU.Bind( wx.EVT_BUTTON, self.doEnableMMU )
 		self.bDisableMMU.Bind( wx.EVT_BUTTON, self.doDisableMMU )
 		self.bExec.Bind( wx.EVT_BUTTON, self.doExecAddress )
@@ -447,6 +489,7 @@ class main ( wx.Frame ):
 		self.bDoIDCODE.Bind( wx.EVT_BUTTON, self.doIDCODE )
 		self.bDoBYPASS.Bind( wx.EVT_BUTTON, self.doBYPASS )
 		self.bDoRTCK.Bind( wx.EVT_BUTTON, self.doRTCK )
+		self.bRegenUID.Bind( wx.EVT_BUTTON, self.doRegenUUID )
 
 	def __del__( self ):
 		pass
@@ -496,6 +539,9 @@ class main ( wx.Frame ):
 	def doScript( self, event ):
 		event.Skip()
 
+	def doLoader( self, event ):
+		event.Skip()
+
 	def doEnableMMU( self, event ):
 		event.Skip()
 
@@ -521,6 +567,9 @@ class main ( wx.Frame ):
 		event.Skip()
 
 	def doRTCK( self, event ):
+		event.Skip()
+
+	def doRegenUUID( self, event ):
 		event.Skip()
 
 

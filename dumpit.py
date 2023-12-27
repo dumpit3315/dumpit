@@ -20,8 +20,12 @@ import traceback
 import json
 from urllib import request
 import gc
+import uuid
+import platform
 
 os.environ["WXSUPPRESS_SIZER_FLAGS_CHECK"] = "1"
+_PTRACKING = queue.Queue()
+_PTRACKCOUNT = {}
 
 # Unix, Windows and old Macintosh end-of-line
 newlines = [b'\n', b'\r\n', b'\r']
@@ -50,6 +54,27 @@ def _msleep(dur: int):
     s = time.perf_counter_ns()
     while time.perf_counter_ns()<(s+(dur*1000)):
         pass
+    
+def doTrackThread(user_id, action, openocd_version, config, **kwargs):    
+    try:
+        req = request.Request("https://dumpit.ucomsite.my.id/analytics/track", data=json.dumps({
+            "user_id": user_id, 
+            "action": action, 
+            "dumpit_version": const.DUMPIT_VERSION, 
+            "python_version": sys.version, 
+            "openocd_version": openocd_version, 
+            "os": f"{platform.system()} {platform.version()}", 
+            "config": config, 
+            "params": kwargs
+        }), header={"Content-Type": "application/json"}, method="POST")
+        
+        with request.urlopen(req, timeout=5) as res:
+            assert res.getcode() >= 200 and res.getcode() <= 299
+            _PTRACKING.put(action)
+        
+    except Exception:
+        print("unable to track:")
+        traceback.print_exc()
 
 class ForwardApp(forwardDialog.forwardDialog):
     def __init__(self, parent, token):
@@ -66,7 +91,7 @@ class ForwardApp(forwardDialog.forwardDialog):
         self._wsThread = threading.Thread(target=self._doWSLoop)
         self._wsThread.daemon = True
         
-        self._wsThread.start()
+        self._wsThread.start()                
         
     def _doWSLoop(self):
         while True:
@@ -110,6 +135,8 @@ class ForwardApp(forwardDialog.forwardDialog):
             if not self._ws_parent._sio.connected:
                 if self._isConnect and self._ocd.poll() is None:
                     self._ocd.terminate()
+                    
+                self._ws_parent._doAnalytics("disconnect", reason=1)
                 
                 self.Unbind(wx.EVT_IDLE)                
                 return self.EndModal(0)
@@ -117,7 +144,8 @@ class ForwardApp(forwardDialog.forwardDialog):
             q = self._wsThreadQueue.get_nowait()
             
             if q[0] == "forward_client_connected":
-                INIT_CMD = getInitCmd(self._ws_parent)            
+                INIT_CMD = getInitCmd(self._ws_parent)        
+                self._ws_parent._doAnalytics("connect", type=1)     
                                     
                 self.tPin.Hide()
                 self.lPin.Hide()
@@ -391,6 +419,8 @@ class FT232RConfig(ft232r_pinconfig.FT232R_Pin_Config):
 
 class MainApp(main.main):
     def __init__(self, parent):
+        global _PTRACKCOUNT
+        
         super().__init__(parent)    
         self.status.Value = ""    
         self.finderStatus.Value = ""
@@ -434,7 +464,9 @@ class MainApp(main.main):
         self.cChipset.Selection = 0
         self.progress.Value = 0
         
-        self.status.Value += "Dumpit v0.5"
+        self._ocd_version = subprocess.check_output([getOCDExec(), "--version"], encoding="utf-8", stderr=subprocess.STDOUT).splitlines()[0].rstrip()
+        
+        self.status.Value += f"Dumpit v{const.DUMPIT_VERSION}\nOpenOCD: {self._ocd_version}"
         
         ''' Start dumpit stuff '''
         self._isConnect = False
@@ -496,6 +528,7 @@ class MainApp(main.main):
             self.bECCDisable.Value = cfg["ecc_disabled"]
             self.bBadBlockinData.Value = cfg["bad_blocks_in_data"]
             self.bTargetRemote.Value = cfg["target_remote"]
+            self.bUseGDB.Value = cfg["use_gdb"]
             
             self.tUSBID.Value = cfg["ft232r_usb_id"]
             self.tRestoreSerial.Value = cfg["ft232r_restore_serial"]
@@ -520,9 +553,65 @@ class MainApp(main.main):
             self._ft232h_dirs = 0xffff & ~(1 << self._ft232h_tdo)
             
             self.bUseMPSSE.Value = cfg["finder_use_mpsse"]
+            
+            self.bEnableAnalytics.Value = cfg["enable_analytics"]
+            self.tUserID.Value = cfg["user_id"]
+            
+            _PTRACKCOUNT = cfg["tracking_count"]
+            
+            
+        if not self.tUserID.Value:
+            self.tUserID.Value = str(uuid.uuid4())
         
         self.Update()
         self.Layout()            
+
+    def _doAnalytics(self, action, **kwargs):
+        if self.bEnableAnalytics.Value:
+            cfg = {}
+            
+            cfg["interface"] = self.cInterface.GetString(self.cInterface.Selection)
+            cfg["speed"] = self.nSpeed.Value
+            cfg["chipset"] = self.cChipset.GetString(self.cChipset.Selection)
+            cfg["target"] = self.cTarget.GetString(self.cTarget.Selection)
+            cfg["tap"] = self.cTap.GetString(self.cTap.Selection)
+            cfg["ir"] = self.nIR.Value
+            cfg["reset_mode"] = self.cResetMode.GetString(self.cResetMode.Selection)
+            cfg["reset_delay"] = self.cResetDelay.GetString(self.cResetDelay.Selection)
+            cfg["start"] = self.tStart.Value
+            cfg["end"] = self.tEnd.Value
+            cfg["nand_size"] = self.cNandSize.GetString(self.cNandSize.Selection)
+            cfg["ecc_disabled"] = self.bECCDisable.Value
+            cfg["bad_blocks_in_data"] = self.bBadBlockinData.Value            
+            cfg["use_gdb"] = self.bUseGDB.Value
+            
+            cfg["ft232r_usb_id"] = self.tUSBID.Value
+            cfg["ft232r_restore_serial"] = self.tRestoreSerial.Value
+            cfg["ft232r_tdi"] = self._ft232r_tdi
+            cfg["ft232r_tdo"] = self._ft232r_tdo
+            cfg["ft232r_tms"] = self._ft232r_tck
+            cfg["ft232r_tck"] = self._ft232r_tms
+            cfg["ft232r_trst"] = self._ft232r_trst
+            cfg["ft232r_srst"] = self._ft232r_srst
+            
+            cfg["ft232h_usb_id"] = self.tUSBID1.Value
+            cfg["ft232h_channel"] = self.cChannel.Selection
+            cfg["ft232h_sampling_edge"] = self.rSamplingEdge.GetString(self.rSamplingEdge.Selection)
+            cfg["ft232h_tdi"] = self._ft232h_tdi
+            cfg["ft232h_tdo"] = self._ft232h_tdo
+            cfg["ft232h_tck"] = self._ft232h_tck
+            cfg["ft232h_tms"] = self._ft232h_tms
+            cfg["ft232h_trst"] = self._ft232h_trst
+            cfg["ft232h_srst"] = self._ft232h_srst
+            
+            cfg["ft232h_pins"] = self._ft232h_pins            
+            
+            cfg["finder_use_mpsse"] = self.bUseMPSSE.Value            
+            
+            pAnalyticsThread = threading.Thread(target=doTrackThread, args=(self.tUserID.Value, action, self._ocd_version, cfg), kwargs=kwargs)
+            pAnalyticsThread.daemon = True
+            
+            pAnalyticsThread.start()
 
     def _doLogging(self):
         for l in _unbuffered(self._ocd, "stderr"):
@@ -550,6 +639,18 @@ class MainApp(main.main):
                 pass
 
     def doLoop( self, event ):
+        global _PTRACKCOUNT
+        
+        try:
+            track = _PTRACKING.get_nowait()
+            if track not in _PTRACKCOUNT: _PTRACKCOUNT[track] = 0
+            
+            _PTRACKCOUNT[track] += 1
+            
+            
+        except queue.Empty:
+            pass
+        
         if self._logThreadQueue:
             try:               
                 if not self._isRead:
@@ -599,12 +700,14 @@ class MainApp(main.main):
             self.bConnect.Label = "Connect"
             self.bConnectRemote.Enable(True)
             self.bForwardRemote.Enable(True)
+            self._doAnalytics("disconnect", reason=1)
             
         if self._sio and self._isConnectRemote and not self._sio.connected:
             self._isConnectRemote = False                        
             self.bConnect.Label = "Connect"
             self.bConnectRemote.Enable(True)
             self.bForwardRemote.Enable(True)
+            self._doAnalytics("disconnect", reason=2)
             
     def _ocdSendCommand(self, cmd: str):
         if self._ocd and self._ocd.poll() is None:
@@ -635,6 +738,7 @@ class MainApp(main.main):
             self.bConnect.Label = "Connect"
             self.bConnectRemote.Enable(True)
             self.bForwardRemote.Enable(True)
+            self._doAnalytics("disconnect", reason=0)     
             
         elif self._isConnectRemote:            
             self._isConnectRemote = False            
@@ -645,12 +749,15 @@ class MainApp(main.main):
             self.bConnect.Label = "Connect"
             self.bConnectRemote.Enable(True)
             self.bForwardRemote.Enable(True)                    
+            self._doAnalytics("disconnect", reason=0)
             
         else:            
             if self._ocd and self._ocd.poll() is None: self._ocd.kill()
             gc.collect()
                        
-            INIT_CMD = getInitCmd(self)            
+            INIT_CMD = getInitCmd(self)           
+            
+            self._doAnalytics("connect", type=0) 
                 
             #print(INIT_CMD)
             
@@ -675,12 +782,17 @@ class MainApp(main.main):
             self.bConnectRemote.Enable(False)
             self.bForwardRemote.Enable(False)
             
-            idcode = self.cmd_get_idcode()            
+            self._doAnalytics("idcode", idcode=self.cmd_get_idcode())           
         
     def doConnectRemote(self, event):
         try:
+            if self._sio: 
+                self._sio.disconnect()                
+            
             self._sio = socketio.SimpleClient()
             gc.collect()
+            
+            self._doAnalytics("connect", type=2)
                                                   
             self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith("::1") or self.bTargetRemote.Value.startswith("[::1]") else f"https://{self.bTargetRemote.Value}/", transports=["websocket"], socketio_path="dumpit_remote")
                                                             
@@ -714,14 +826,15 @@ class MainApp(main.main):
             self.bConnect.Label = "Disconnect"
             self.bConnectRemote.Enable(False)
             self.bForwardRemote.Enable(False)   
-            
-            idcode = self.cmd_get_idcode()                     
+                        
+            self._doAnalytics("idcode", idcode=self.cmd_get_idcode())       
                         
         except Exception as e:
             if self._sio and self._sio.connected: 
                 self._sio.emit("bye")
                 self._sio.disconnect()
                 
+            self._doAnalytics("error", error=str(e), traceback=traceback.format_exc())
             wx.MessageBox(str(e), "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
     
     def doForwardRemote(self, event):
@@ -741,6 +854,7 @@ class MainApp(main.main):
                 self._sio.emit("bye")
                 self._sio.disconnect()
                 
+            self._doAnalytics("error", error=str(e), traceback=traceback.format_exc())
             wx.MessageBox(str(e), "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
 
     def doHexCheck( self, event: wx.CommandEvent ):
@@ -794,7 +908,7 @@ class MainApp(main.main):
         
     def cmd_write_cp15(self, cr_n, op_1, cr_m, op_2, value):
         if not self._isConnect and not self._isConnectRemote: return 0
-        self._ocdSendCommand(f"arm mcr 15 {op_1} {cr_n} {cr_m} {op_2} {value}")
+        self._ocdSendCommand(f"arm mcr 15 {hex(op_1)} {hex(cr_n)} {hex(cr_m)} {hex(op_2)} {hex(value)}")
         
     def cmd_write_u8(self, offset: int, value: int):
         if not self._isConnect and not self._isConnectRemote: return
@@ -813,6 +927,7 @@ class MainApp(main.main):
         self._isReadCanceled = False
         
         self._btnMsgQueue.put(True)
+        self._doAnalytics("dump_start", addr_start=cOffset, addr_end=eOffset, is_memory=True)
         
         try:                                        
             with open(name, "wb") as tempFile:
@@ -824,6 +939,7 @@ class MainApp(main.main):
                     
         except Exception as e:
             traceback.print_exc()
+            self._doAnalytics("error", error=str(e), traceback=traceback.format_exc())
             self._errMsgQueue.put(str(e))
                     
         finally:
@@ -832,6 +948,8 @@ class MainApp(main.main):
             self._btnMsgQueue.put(False)
             self._isRead = False
             self._isReadCanceled = False
+            
+            self._doAnalytics("dump_end", addr_start=cOffset, addr_end=eOffset, is_memory=True)
         
     def doReadMemory( self, event ):
         if (not self._isConnect and not self._isConnectRemote) or self._isRead: return
@@ -865,6 +983,7 @@ class MainApp(main.main):
         QSC_NAND_CFG1 = 0
         
         self._btnMsgQueue.put(True)
+        self._doAnalytics("dump_start", addr_start=cOffset, addr_end=eOffset, is_memory=False)
             
         try:                    
             if const._platforms[self.cChipset.Selection]["mode"] in [1, 2]:
@@ -1158,7 +1277,8 @@ class MainApp(main.main):
 
         except Exception as e:
             traceback.print_exc()
-            self._errMsgQueue.put(str(e))
+            self._doAnalytics("error", error=str(e), traceback=traceback.format_exc())
+            self._errMsgQueue.put(str(e))            
 
         finally:            
             self._logThreadQueue.queue.clear()
@@ -1166,6 +1286,8 @@ class MainApp(main.main):
             self._btnMsgQueue.put(False)
             self._isRead = False
             self._isReadCanceled = False
+            
+            self._doAnalytics("dump_end", addr_start=cOffset, addr_end=eOffset, is_memory=False)
                         
     def doReadFlash( self, event ):
         if (not self._isConnect and not self._isConnectRemote) or self._isRead: return
@@ -1242,6 +1364,13 @@ class MainApp(main.main):
         else:
             self.pSettingsNull.Show()
             
+        temp_analytics = "Tracking count:\n"        
+            
+        for k in _PTRACKCOUNT:            
+            temp_analytics += f"{k}: {_PTRACKCOUNT[k]}\n"
+            
+        self.analytics_stat.Value = temp_analytics
+            
         self.Sizer.Layout()
     
     def doOpenFT232RConfig( self, event ):
@@ -1278,6 +1407,7 @@ class MainApp(main.main):
                 
         except Exception as e:
             traceback.print_exc()
+            self._doAnalytics("error", error=str(e), traceback=traceback.format_exc())
             wx.MessageBox(str(e), "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
 
     def doBYPASS( self, event ):
@@ -1310,6 +1440,7 @@ class MainApp(main.main):
             
         except Exception as e:
             traceback.print_exc()
+            self._doAnalytics("error", error=str(e), traceback=traceback.format_exc())
             wx.MessageBox(str(e), "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
 
     def doRTCK( self, event ):
@@ -1337,6 +1468,7 @@ class MainApp(main.main):
                 
         except Exception as e:
             traceback.print_exc()
+            self._doAnalytics("error", error=str(e), traceback=traceback.format_exc())
             wx.MessageBox(str(e), "Dumpit", wx.OK|wx.CENTER|wx.ICON_ERROR, self)
 
     def doQuit(self, event: wx.CloseEvent):
@@ -1367,6 +1499,7 @@ class MainApp(main.main):
             cfg["ecc_disabled"] = self.bECCDisable.Value
             cfg["bad_blocks_in_data"] = self.bBadBlockinData.Value
             cfg["target_remote"] = self.bTargetRemote.Value
+            cfg["use_gdb"] = self.bUseGDB.Value
             
             cfg["ft232r_usb_id"] = self.tUSBID.Value
             cfg["ft232r_restore_serial"] = self.tRestoreSerial.Value
@@ -1391,6 +1524,11 @@ class MainApp(main.main):
             
             cfg["finder_use_mpsse"] = self.bUseMPSSE.Value
             
+            cfg["enable_analytics"] = self.bEnableAnalytics.Value
+            cfg["user_id"] = self.tUserID.Value
+            
+            cfg["tracking_count"] = _PTRACKCOUNT
+            
             json.dump(cfg, open(os.path.join(os.path.dirname(__file__), "dumpit_config.json"), "w"), indent=4)            
             event.Skip()
             
@@ -1400,6 +1538,18 @@ class MainApp(main.main):
         if not self._isConnect and not self._isConnectRemote: return
         
         self._ocdSendCommand(temp)
+        
+    def doRegenUUID(self, event):
+        global _PTRACKCOUNT
+        self.tUserID.Value = str(uuid.uuid4())
+        _PTRACKCOUNT = {}
+        
+        temp_analytics = "Tracking count:\n"        
+            
+        for k in _PTRACKCOUNT:            
+            temp_analytics += f"{k}: {_PTRACKCOUNT[k]}\n"
+            
+        self.analytics_stat.Value = temp_analytics
 
 def getInitCmd(self: MainApp):    
     cInit = const._interfaces[self.cInterface.Selection][1].replace('(FT232R_VID)', self.tUSBID.Value.split(':')[0]).replace('(FT232R_PID)', self.tUSBID.Value.split(':')[1]).replace('(FT232R_RESTORE_SERIAL)', self.tRestoreSerial.Value).replace('(FT232H_VID)', self.tUSBID1.Value.split(':')[0]).replace('(FT232H_PID)', self.tUSBID1.Value.split(':')[1]).replace('(FT232H_CHANNEL)', str(self.cChannel.Selection)).replace('(FT232H_EDGE)', ['rising', 'falling'][self.rSamplingEdge.Selection]).replace('(FT232H_PINS)', hex(self._ft232h_pins)).replace('(FT232H_DIR)', hex(self._ft232h_dirs)).replace('(FT232H_LAYOUT_SIGNAL)', f'ftdi layout_signal nTRST -data {hex(1 << self._ft232h_trst)} -oe {hex(1 << self._ft232h_trst)}; ftdi layout_signal nSRST -data {hex(1 << self._ft232h_srst)} -oe {hex(1 << self._ft232h_srst)}; ftdi layout_signal TDI -data {hex(1 << self._ft232h_tdi)}; ftdi layout_signal TDO -data {hex(1 << self._ft232h_tdo)} -oe {hex(1 << self._ft232h_tdo)}; ftdi layout_signal TCK -data {hex(1 << self._ft232h_tck)}; ftdi layout_signal TMS -data {hex(1 << self._ft232h_tms)}').replace("(FT232R_PINS)", "")

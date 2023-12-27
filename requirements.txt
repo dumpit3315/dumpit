@@ -1,0 +1,3 @@
+pyftdi==0.55.0
+wxPython==4.2.1
+python-socketio==5.10.0
