@@ -66,7 +66,7 @@ def doTrackThread(user_id, action, openocd_version, config, **kwargs):
             "os": f"{platform.system()} {platform.version()}", 
             "config": config, 
             "params": kwargs
-        }), headers={"Content-Type": "application/json"}, method="POST")
+        }).encode("utf-8"), headers={"Content-Type": "application/json"}, method="POST")
         
         with request.urlopen(req, timeout=5) as res:
             assert res.getcode() >= 200 and res.getcode() <= 299
