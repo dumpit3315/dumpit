@@ -130,6 +130,9 @@ class main ( wx.Frame ):
 		self.cResetDelay.SetSelection( 0 )
 		bSizer611.Add( self.cResetDelay, 1, wx.ALL, 5 )
 
+		self.bSkipInit = wx.CheckBox( self.dPage1, wx.ID_ANY, u"Skip Initialization", wx.DefaultPosition, wx.DefaultSize, 0 )
+		bSizer611.Add( self.bSkipInit, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
 
 		bSizer5.Add( bSizer611, 0, wx.EXPAND, 5 )
 
@@ -224,14 +227,15 @@ class main ( wx.Frame ):
 		self.bReset = wx.Button( self.dPage1, wx.ID_ANY, u"Reset", wx.DefaultPosition, wx.DefaultSize, 0 )
 		bSizer611111.Add( self.bReset, 0, wx.ALL, 5 )
 
+		self.bHardReset = wx.Button( self.dPage1, wx.ID_ANY, u"Hard Reset", wx.DefaultPosition, wx.DefaultSize, 0 )
+		bSizer611111.Add( self.bHardReset, 0, wx.ALL, 5 )
+
 		self.bExecScript = wx.Button( self.dPage1, wx.ID_ANY, u"Execute Script", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.bExecScript.Enable( False )
 
 		bSizer611111.Add( self.bExecScript, 1, wx.ALL, 5 )
 
-		self.bExecLoader = wx.Button( self.dPage1, wx.ID_ANY, u"Execute Loader", wx.DefaultPosition, wx.DefaultSize, 0 )
-		self.bExecLoader.Enable( False )
-
+		self.bExecLoader = wx.Button( self.dPage1, wx.ID_ANY, u"Load DCC", wx.DefaultPosition, wx.DefaultSize, 0 )
 		bSizer611111.Add( self.bExecLoader, 1, wx.ALL, 5 )
 
 
@@ -326,10 +330,135 @@ class main ( wx.Frame ):
 		bSizer91.Fit( self.pSettingsFT232R )
 		bSizer8.Add( self.pSettingsFT232R, 1, wx.EXPAND |wx.ALL, 5 )
 
+		self.pSettingsGPIOD = wx.Panel( self.dPage2, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
+		self.pSettingsGPIOD.Hide()
+
+		bSizer912 = wx.BoxSizer( wx.VERTICAL )
+
+		bSizer151222 = wx.BoxSizer( wx.HORIZONTAL )
+
+		self.lGPIODChip = wx.StaticText( self.pSettingsGPIOD, wx.ID_ANY, u"Chip:", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.lGPIODChip.Wrap( -1 )
+
+		bSizer151222.Add( self.lGPIODChip, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+		self.nGPIODChip = wx.SpinCtrl( self.pSettingsGPIOD, wx.ID_ANY, u"0", wx.DefaultPosition, wx.DefaultSize, wx.SP_ARROW_KEYS, 0, 100, 0 )
+		self.nGPIODChip.SetMinSize( wx.Size( 200,-1 ) )
+
+		bSizer151222.Add( self.nGPIODChip, 0, wx.ALL, 5 )
+
+
+		bSizer912.Add( bSizer151222, 0, wx.EXPAND, 5 )
+
+		bSizer15122 = wx.BoxSizer( wx.HORIZONTAL )
+
+		self.bConfigureLayoutGPIOD = wx.Button( self.pSettingsGPIOD, wx.ID_ANY, u"Configure Layout", wx.DefaultPosition, wx.DefaultSize, 0 )
+		bSizer15122.Add( self.bConfigureLayoutGPIOD, 1, wx.ALL, 5 )
+
+
+		bSizer912.Add( bSizer15122, 0, wx.EXPAND, 5 )
+
+
+		self.pSettingsGPIOD.SetSizer( bSizer912 )
+		self.pSettingsGPIOD.Layout()
+		bSizer912.Fit( self.pSettingsGPIOD )
+		bSizer8.Add( self.pSettingsGPIOD, 1, wx.EXPAND |wx.ALL, 5 )
+
+		self.pSettingsParPort = wx.Panel( self.dPage2, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
+		self.pSettingsParPort.Hide()
+
+		bSizer9121 = wx.BoxSizer( wx.VERTICAL )
+
+		bSizer1531 = wx.BoxSizer( wx.HORIZONTAL )
+
+		self.lParCable = wx.StaticText( self.pSettingsParPort, wx.ID_ANY, u"Cable:", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.lParCable.Wrap( -1 )
+
+		bSizer1531.Add( self.lParCable, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+		cParCableChoices = [ u"DLC5", u"Wiggler" ]
+		self.cParCable = wx.Choice( self.pSettingsParPort, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, cParCableChoices, 0 )
+		self.cParCable.SetSelection( 0 )
+		bSizer1531.Add( self.cParCable, 1, wx.ALL, 5 )
+
+
+		bSizer9121.Add( bSizer1531, 0, wx.EXPAND, 5 )
+
+		bSizer15131 = wx.BoxSizer( wx.HORIZONTAL )
+
+		self.lParPort = wx.StaticText( self.pSettingsParPort, wx.ID_ANY, u"Port:", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.lParPort.Wrap( -1 )
+
+		bSizer15131.Add( self.lParPort, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+		self.tParPort = wx.TextCtrl( self.pSettingsParPort, wx.ID_ANY, u"0", wx.DefaultPosition, wx.DefaultSize, 0 )
+		bSizer15131.Add( self.tParPort, 1, wx.ALL, 5 )
+
+
+		bSizer9121.Add( bSizer15131, 0, wx.EXPAND, 5 )
+
+
+		self.pSettingsParPort.SetSizer( bSizer9121 )
+		self.pSettingsParPort.Layout()
+		bSizer9121.Fit( self.pSettingsParPort )
+		bSizer8.Add( self.pSettingsParPort, 1, wx.EXPAND |wx.ALL, 5 )
+
+		self.pSettingsRemoteBitbang = wx.Panel( self.dPage2, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
+		self.pSettingsRemoteBitbang.Hide()
+
+		bSizer91211 = wx.BoxSizer( wx.VERTICAL )
+
+		bSizer15311 = wx.BoxSizer( wx.HORIZONTAL )
+
+		self.lRBBHost = wx.StaticText( self.pSettingsRemoteBitbang, wx.ID_ANY, u"Host:", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.lRBBHost.Wrap( -1 )
+
+		bSizer15311.Add( self.lRBBHost, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+		self.tRBBHost = wx.TextCtrl( self.pSettingsRemoteBitbang, wx.ID_ANY, u"127.0.0.1", wx.DefaultPosition, wx.DefaultSize, 0 )
+		bSizer15311.Add( self.tRBBHost, 1, wx.ALL, 5 )
+
+
+		bSizer91211.Add( bSizer15311, 0, wx.EXPAND, 5 )
+
+		bSizer151311 = wx.BoxSizer( wx.HORIZONTAL )
+
+		self.lRBBPort = wx.StaticText( self.pSettingsRemoteBitbang, wx.ID_ANY, u"Port:", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.lRBBPort.Wrap( -1 )
+
+		bSizer151311.Add( self.lRBBPort, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+		self.tRBBPort = wx.TextCtrl( self.pSettingsRemoteBitbang, wx.ID_ANY, u"3463", wx.DefaultPosition, wx.DefaultSize, 0 )
+		bSizer151311.Add( self.tRBBPort, 1, wx.ALL, 5 )
+
+
+		bSizer91211.Add( bSizer151311, 0, wx.EXPAND, 5 )
+
+
+		self.pSettingsRemoteBitbang.SetSizer( bSizer91211 )
+		self.pSettingsRemoteBitbang.Layout()
+		bSizer91211.Fit( self.pSettingsRemoteBitbang )
+		bSizer8.Add( self.pSettingsRemoteBitbang, 1, wx.EXPAND |wx.ALL, 5 )
+
 		self.pSettingsFT232H = wx.Panel( self.dPage2, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
 		self.pSettingsFT232H.Hide()
 
 		bSizer911 = wx.BoxSizer( wx.VERTICAL )
+
+		bSizer1521 = wx.BoxSizer( wx.HORIZONTAL )
+
+		self.lFTAdapter = wx.StaticText( self.pSettingsFT232H, wx.ID_ANY, u"Adapter:", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.lFTAdapter.Wrap( -1 )
+
+		bSizer1521.Add( self.lFTAdapter, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+		cFTAdapterChoices = []
+		self.cFTAdapter = wx.Choice( self.pSettingsFT232H, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, cFTAdapterChoices, 0 )
+		self.cFTAdapter.SetSelection( 0 )
+		bSizer1521.Add( self.cFTAdapter, 0, wx.ALL, 5 )
+
+
+		bSizer911.Add( bSizer1521, 0, wx.EXPAND, 5 )
 
 		bSizer152 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -478,6 +607,7 @@ class main ( wx.Frame ):
 		self.bGo.Bind( wx.EVT_BUTTON, self.doGo )
 		self.bHalt.Bind( wx.EVT_BUTTON, self.doHalt )
 		self.bReset.Bind( wx.EVT_BUTTON, self.doReset )
+		self.bHardReset.Bind( wx.EVT_BUTTON, self.doHardReset )
 		self.bExecScript.Bind( wx.EVT_BUTTON, self.doScript )
 		self.bExecLoader.Bind( wx.EVT_BUTTON, self.doLoader )
 		self.bEnableMMU.Bind( wx.EVT_BUTTON, self.doEnableMMU )
@@ -485,6 +615,8 @@ class main ( wx.Frame ):
 		self.bExec.Bind( wx.EVT_BUTTON, self.doExecAddress )
 		self.tOCDCmd.Bind( wx.EVT_TEXT_ENTER, self.doOCDCmdExec )
 		self.bConfigureLayoutFT232R.Bind( wx.EVT_BUTTON, self.doOpenFT232RConfig )
+		self.bConfigureLayoutGPIOD.Bind( wx.EVT_BUTTON, self.doOpenGPIODConfig )
+		self.cFTAdapter.Bind( wx.EVT_CHOICE, self.doFT232AdapterChange )
 		self.bConfigureLayoutFT232H.Bind( wx.EVT_BUTTON, self.doOpenFT232HConfig )
 		self.bDoIDCODE.Bind( wx.EVT_BUTTON, self.doIDCODE )
 		self.bDoBYPASS.Bind( wx.EVT_BUTTON, self.doBYPASS )
@@ -536,6 +668,9 @@ class main ( wx.Frame ):
 	def doReset( self, event ):
 		event.Skip()
 
+	def doHardReset( self, event ):
+		event.Skip()
+
 	def doScript( self, event ):
 		event.Skip()
 
@@ -555,6 +690,12 @@ class main ( wx.Frame ):
 		event.Skip()
 
 	def doOpenFT232RConfig( self, event ):
+		event.Skip()
+
+	def doOpenGPIODConfig( self, event ):
+		event.Skip()
+
+	def doFT232AdapterChange( self, event ):
 		event.Skip()
 
 	def doOpenFT232HConfig( self, event ):
