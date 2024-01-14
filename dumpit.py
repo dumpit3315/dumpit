@@ -168,7 +168,7 @@ class ForwardApp(forwardDialog.forwardDialog):
                 self._ocd = subprocess.Popen([getOCDExec(
                 ), "-c", INIT_CMD], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-                self._ocdSendCommand("halt")
+                self._ocdSendCommand("")
 
                 self._logThread = threading.Thread(target=self._doLogging)
                 self._logThread.daemon = True
@@ -861,7 +861,7 @@ class MainApp(main.main):
             self._ocd = subprocess.Popen([getOCDExec(
             ), "-c", INIT_CMD], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-            self._ocdSendCommand("halt")
+            self._ocdSendCommand("")
 
             self._logThreadQueue = queue.Queue()
 
@@ -1978,7 +1978,7 @@ def getInitCmd(self: MainApp):
             INIT_CMD += f"flash bank target.nor cfi 0x{self.tStart.Value} {hex(int(self.tEnd.Value, 16) - int(self.tStart.Value, 16))} {const._platforms[self.cChipset.Selection]['chip_width']} {const._platforms[self.cChipset.Selection]['bus_width']} target.cpu; "
             self._cfi_start_offset = int(self.tStart.Value, 16)
 
-        INIT_CMD += "target.cpu configure -event examine-end { "
+        INIT_CMD += "target.cpu configure -event examine-end { halt; "
         if not self.bSkipInit.Value:
             for i in const._platforms[self.cChipset.Selection]["init"]:
                 if i["type"] == 1:
