@@ -1164,7 +1164,7 @@ class MainApp(main.main):
                 self._ocdSendCommand("soft_reset_halt")                
                 self._ocdSendCommand(f"load_image $_DCC_PATH", False)
                 self._ocdSendCommand(
-                    f"resume {hex(intelhex.IntelHex(self._loaded_dcc).minaddr())}")
+                    f"resume $_DCC_START_OFFSET")
 
                 if not self._ocdSendCommand("flash probe 0").startswith("flash 'ocl' found at"):
                     raise Exception("Flash probe failed!")
@@ -2008,7 +2008,7 @@ def getInitCmd(self: MainApp):
 
         if self._loaded_dcc is not None:
             path_escaped = self._loaded_dcc.replace('\\', '/')
-            INIT_CMD += "flash bank target.dcc ocl 0 0 0 0 target.cpu; set _DCC_PATH {" + path_escaped + "}; "
+            INIT_CMD += "flash bank target.dcc ocl 0 0 0 0 target.cpu; set _DCC_PATH {" + path_escaped + "}; " + f"set _DCC_OFFSET {hex(intelhex.IntelHex(self._loaded_dcc).minaddr())}; "
 
         elif const._platforms[self.cChipset.Selection]["mode"] == -1:
             INIT_CMD += "flash bank target.dcc dummy_flash 0 0 0 0 target.cpu; "
