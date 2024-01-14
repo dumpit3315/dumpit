@@ -23,6 +23,7 @@ import gc
 import uuid
 import platform
 import intelhex
+import datetime
 
 os.environ["WXSUPPRESS_SIZER_FLAGS_CHECK"] = "1"
 _PTRACKING = queue.Queue()
@@ -529,6 +530,8 @@ class MainApp(main.main):
         self._isRead = False
         self._isReadCanceled = False
 
+        self._logSupressed = False
+
         self._ft232h_tdi = const._ft232h_default_jtag_tdi
         self._ft232h_tdo = const._ft232h_default_jtag_tdo
         self._ft232h_tms = const._ft232h_default_jtag_tms
@@ -708,7 +711,7 @@ class MainApp(main.main):
     def _doLogging(self):
         for l in _unbuffered(self._ocd, "stderr"):
             try:
-                if not self._isRead:
+                if not self._logSupressed:
                     self._logThreadQueue.put(l.decode("utf-8"))
 
             except Exception:
@@ -1076,6 +1079,9 @@ class MainApp(main.main):
         self._doAnalytics("dump_start", addr_start=cOffset,
                           addr_end=eOffset, is_memory=True)
 
+        self._logSupressed = True
+        self._logThreadQueue.push(f"Dump memory started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
+
         try:
             with open(name, "wb") as tempFile:
                 while cOffset < eOffset and not self._isReadCanceled:
@@ -1084,6 +1090,8 @@ class MainApp(main.main):
                     cOffset += min(0x200, eOffset - cOffset)
 
                     self._progMsgQueue.put(cOffset/eOffset)
+
+            self._logThreadQueue.push(f"Dump memory finished {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
 
         except Exception as e:
             traceback.print_exc()
@@ -1096,6 +1104,7 @@ class MainApp(main.main):
             self._btnMsgQueue.put(False)
             self._isRead = False
             self._isReadCanceled = False
+            self._logSupressed = False
 
             self._doAnalytics("dump_end", addr_start=cOffset,
                               addr_end=eOffset, is_memory=True)
@@ -1218,6 +1227,9 @@ class MainApp(main.main):
                 O1N_isDDP = bool(O1N_DevID & 8)
                 O1N_Density = 2 << (
                     (5 if O1N_isDDP else 6) + ((O1N_DevID >> 4) & 0xf))
+
+            self._logSupressed = True
+            self._logThreadQueue.push(f"Dump flash started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
 
             with open(name, "wb") as tempFile:
                 while cOffset < eOffset and not self._isReadCanceled:
@@ -1555,6 +1567,7 @@ class MainApp(main.main):
                     self._progMsgQueue.put(cOffset/eOffset)
 
                 tempFile.write(spareBuf + bbBuf)
+                self._logThreadQueue.push(f"Dump flash finished {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
                 # tempFile.write() # TODO: Write Dumpit Device Footer format
 
         except Exception as e:
@@ -1568,6 +1581,7 @@ class MainApp(main.main):
             self._btnMsgQueue.put(False)
             self._isRead = False
             self._isReadCanceled = False
+            self._logSupressed = False
 
             self._doAnalytics("dump_end", addr_start=cOffset,
                               addr_end=eOffset, is_memory=False)
