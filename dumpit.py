@@ -80,8 +80,9 @@ def doTrackThread(user_id, action, openocd_version, config, **kwargs):
             _PTRACKING.put(action)
 
     except Exception:
-        print("unable to track:")
-        traceback.print_exc()
+        if False:
+            print("unable to track:")
+            traceback.print_exc()
 
 
 class ForwardApp(forwardDialog.forwardDialog):
@@ -2023,7 +2024,7 @@ def getInitCmd(self: MainApp):
 
 
 if __name__ == "__main__":
-    app = wx.App()
+    app = wx.App(True)
     m = MainApp(None)
     m.Show()
     app.MainLoop()
