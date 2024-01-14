@@ -1995,6 +1995,9 @@ def getInitCmd(self: MainApp):
         if self._loaded_dcc is not None:
             INIT_CMD += "flash bank target.dcc ocl 0 0 0 0 target.cpu; "
 
+        elif const._platforms[self.cChipset.Selection]["mode"] == -1:
+            INIT_CMD += "flash bank target.dcc dummy_flash 0 0 0 0 target.cpu; "
+
         elif const._platforms[self.cChipset.Selection]["mode"] == 4:
             INIT_CMD += f"flash bank target.nor cfi 0x{self.tStart.Value} {hex(int(self.tEnd.Value, 16) - int(self.tStart.Value, 16))} {const._platforms[self.cChipset.Selection]['chip_width']} {const._platforms[self.cChipset.Selection]['bus_width']} target.cpu; "
             self._cfi_start_offset = int(self.tStart.Value, 16)
