@@ -1155,7 +1155,7 @@ class MainApp(main.main):
 
                 if not self._ocdSendCommand("flash probe 0").startswith("flash 'ocl' found at"):
                     raise Exception("Flash probe failed!")
-                self._logThreadQueue.put(self._ocdSendCommand("flash info 0"))
+                self._ocdSendCommand("flash info 0")
 
             elif const._platforms[self.cChipset.Selection]["mode"] in [1, 2]:
                 self.cmd_write_u32(
@@ -1200,7 +1200,13 @@ class MainApp(main.main):
 
                 if not self._ocdSendCommand("flash probe 0").startswith("flash 'cfi' found at"):
                     raise Exception("Flash probe failed!")
-                self._logThreadQueue.put(self._ocdSendCommand("flash info 0"))
+                self._ocdSendCommand("flash info 0")
+
+            elif const._platforms[self.cChipset.Selection]["mode"] == -1:
+                assert cOffset >= self._cfi_start_offset, f"Read address must be greater or equal than {hex(self._cfi_start_offset)}"
+
+                self._ocdSendCommand("flash probe 0")
+                self._ocdSendCommand("flash info 0")
 
             elif const._platforms[self.cChipset.Selection]["mode"] == 5:
                 if const._platforms[self.cChipset.Selection]["reg_width"] in [0, 1]:
@@ -1234,7 +1240,7 @@ class MainApp(main.main):
 
             with open(name, "wb") as tempFile:
                 while cOffset < eOffset and not self._isReadCanceled:
-                    if self._loaded_dcc is not None or const._platforms[self.cChipset.Selection]["mode"] == 4:
+                    if self._loaded_dcc is not None or const._platforms[self.cChipset.Selection]["mode"] in [-1, 4]:
                         tempFile.write(self.cmd_read_flash(
                             self._cfi_start_offset - cOffset, 0x200))
                         cOffset += 0x200

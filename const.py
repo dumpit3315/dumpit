@@ -71,6 +71,6 @@ _platforms_b = [{'name': 'MSM6025/MSM6050', 'mode': 4, 'chip_width': 2, 'bus_wid
 # 0xf9800000
 
 _platforms_c = [{'name': 'OneNAND PCF5213 (Type A)', 'mode': 7, 'o1n_offset': '28000000', 'init': []}, {'name': 'OneNAND PCF5213 (Type B)', 'mode': 7, 'o1n_offset': '20000000', 'init': []}, {'name': 'OneNAND PNX5230', 'mode': 7, 'o1n_offset': '48000000', 'init': []}, {
-    'name': 'OneNAND BCM2133', 'mode': 7, 'o1n_offset': '4000000', 'init': []}, {'name': 'OneNAND BCM215x', 'mode': 7, 'o1n_offset': '400000', 'init': []}, {'name': 'OneNAND QSC62x0', 'mode': 7, 'o1n_offset': 'f9400000', 'init': []}, {'name': 'OneNAND QSC60x5', 'mode': 7, 'o1n_offset': 'FA600000', 'init': []}]
+    'name': 'OneNAND BCM2133', 'mode': 7, 'o1n_offset': '4000000', 'init': []}, {'name': 'OneNAND BCM215x', 'mode': 7, 'o1n_offset': '400000', 'init': []}, {'name': 'OneNAND QSC62x0', 'mode': 7, 'o1n_offset': 'f9400000', 'init': []}, {'name': 'OneNAND QSC60x5', 'mode': 7, 'o1n_offset': 'FA600000', 'init': []}, {'name': 'NULL', 'mode': -1, 'init': []}]
 
 _platforms = _platforms_a + _platforms_b + _platforms_c
