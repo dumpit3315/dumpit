@@ -72,7 +72,7 @@ def doTrackThread(user_id, action, openocd_version, config, **kwargs):
             "openocd_version": openocd_version,
             "os": f"{platform.system()} {platform.version()}",
             "config": config,
-            "params": kwargs
+            **kwargs
         }).encode("utf-8"), headers={"Content-Type": "application/json"}, method="POST")
 
         with request.urlopen(req, timeout=5) as res:
@@ -80,7 +80,7 @@ def doTrackThread(user_id, action, openocd_version, config, **kwargs):
             _PTRACKING.put(action)
 
     except Exception:
-        if False:
+        if True:
             print("unable to track:")
             traceback.print_exc()
 
@@ -462,6 +462,8 @@ class MainApp(main.main):
         global _PTRACKCOUNT
 
         super().__init__(parent)
+        
+        print("Dumpit started")
         self.status.Value = ""
         self.finderStatus.Value = ""
         for i, n in const._interfaces:
