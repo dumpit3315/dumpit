@@ -1160,7 +1160,8 @@ class MainApp(main.main):
         try:
             if self._loaded_dcc is not None:
                 self._ocdSendCommand("soft_reset_halt")
-                self._ocdSendCommand(f"load_image {self._loaded_dcc}", False)
+                path_escaped = self._loaded_dcc.replace('\\', '/')
+                self._ocdSendCommand(f"load_image {path_escaped}", False)
                 self._ocdSendCommand(
                     f"resume {hex(intelhex.IntelHex(self._loaded_dcc).minaddr())}")
 
