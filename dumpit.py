@@ -1939,7 +1939,8 @@ class MainApp(main.main):
 
             json.dump(cfg, open(os.path.join(os.path.dirname(
                 __file__), "dumpit_config.json"), "w"), indent=4)
-            event.Skip()
+            
+            wx.Exit()
 
     def doOCDCmdExec(self, event):
         temp = self.tOCDCmd.Value
