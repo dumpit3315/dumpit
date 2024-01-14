@@ -1770,7 +1770,7 @@ class MainApp(main.main):
                 p = libfindit.find_jtag_bypass(f"ftdi://{self.tUSBID1.Value}/{self.cChannel.Selection+1}", mpsse=self.bUseMPSSE.Value,
                                                known_tdo=self._known_tdo, known_tck=self._known_tck, known_tms=self._known_tms)
 
-            elif self.cInterface.Selection == 3:
+            elif self.cInterface.Selection == len(const._interfaces) - 1:
                 p = libfindit.find_jtag_bypass(
                     "", True, known_tdo=self._known_tdo, known_tck=self._known_tck, known_tms=self._known_tms)
 
@@ -1809,7 +1809,7 @@ class MainApp(main.main):
                 p = libfindit.find_jtag_rtck(
                     f"ftdi://{self.tUSBID1.Value}/{self.cChannel.Selection+1}", mpsse=self.bUseMPSSE.Value, known_tck=self._known_tck)
 
-            elif self.cInterface.Selection == 3:
+            elif self.cInterface.Selection == len(const._interfaces) - 1:
                 p = libfindit.find_jtag_rtck(
                     "", True, known_tck=self._known_tck)
 
