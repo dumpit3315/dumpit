@@ -506,7 +506,7 @@ class MainApp(main.main):
         for name, parm in const._ft232h_adapters:
             self.cFTAdapter.Append(name)
 
-        self.cFTAdapter.Value = 0
+        self.cFTAdapter.Selection = 0
 
         ''' Start dumpit stuff '''
         self._isConnect = False
