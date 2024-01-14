@@ -180,6 +180,9 @@ class ForwardApp(forwardDialog.forwardDialog):
 
             elif q[0] == "data":
                 self._ws_parent._sio.emit("data", self._ocdSendCommand(q[1]))
+                
+            elif q[0] == "command":
+                pass
 
         except queue.Empty:
             pass
