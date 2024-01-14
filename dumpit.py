@@ -1228,7 +1228,8 @@ class MainApp(main.main):
                 O1N_Density = 2 << (
                     (5 if O1N_isDDP else 6) + ((O1N_DevID >> 4) & 0xf))
 
-            self._logSupressed = True
+            time.sleep(1)
+            self._logSupressed = True            
             self._logThreadQueue.put(f"Dump flash started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
 
             with open(name, "wb") as tempFile:
