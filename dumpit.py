@@ -116,6 +116,7 @@ class ForwardApp(forwardDialog.forwardDialog):
     def _ocdSendCommand(self, cmd: str):
         if self._ws_parent._debug_logs:
             print(f"EXEC {cmd}")
+
         if self._ocd and self._ocd.poll() is None:
             self._ocd.stdin.write(cmd.encode("latin-1") + b"\x1a")
             self._ocd.stdin.flush()
@@ -187,8 +188,10 @@ class ForwardApp(forwardDialog.forwardDialog):
             try:
                 p = self._logThreadQueue.get_nowait()
 
-                self.status.AppendText(p + "\n")
-                self.status.ShowPosition(self.status.GetLastPosition())
+                if not p.startswith("0x"):
+                    self.status.AppendText(p + "\n")
+                    self.status.ShowPosition(self.status.GetLastPosition())
+
                 self._ws_parent._sio.emit("log", p)
 
             except queue.Empty:
@@ -199,7 +202,6 @@ class ForwardApp(forwardDialog.forwardDialog):
     def doStop(self, event):
         self._ws_parent._sio.emit("bye")
         self._ws_parent._sio.disconnect()
-
 
 class FT232HConfig(ft232h_pinconfig.FT232H_Pin_Config):
     def __init__(self, parent):
@@ -1159,9 +1161,8 @@ class MainApp(main.main):
 
         try:
             if self._loaded_dcc is not None:
-                self._ocdSendCommand("soft_reset_halt")
-                path_escaped = self._loaded_dcc.replace('\\', '/')
-                self._ocdSendCommand(f"load_image {path_escaped}", False)
+                self._ocdSendCommand("soft_reset_halt")                
+                self._ocdSendCommand(f"load_image $_DCC_PATH", False)
                 self._ocdSendCommand(
                     f"resume {hex(intelhex.IntelHex(self._loaded_dcc).minaddr())}")
 
@@ -2006,7 +2007,8 @@ def getInitCmd(self: MainApp):
         self._cfi_start_offset = 0
 
         if self._loaded_dcc is not None:
-            INIT_CMD += "flash bank target.dcc ocl 0 0 0 0 target.cpu; "
+            path_escaped = self._loaded_dcc.replace('\\', '/')
+            INIT_CMD += f"flash bank target.dcc ocl 0 0 0 0 target.cpu; set _DCC_PATH \"{path_escaped}\"; "
 
         elif const._platforms[self.cChipset.Selection]["mode"] == -1:
             INIT_CMD += "flash bank target.dcc dummy_flash 0 0 0 0 target.cpu; "
