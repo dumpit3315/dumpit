@@ -1242,7 +1242,7 @@ class MainApp(main.main):
                 while cOffset < eOffset and not self._isReadCanceled:
                     if self._loaded_dcc is not None or const._platforms[self.cChipset.Selection]["mode"] in [-1, 4]:
                         tempFile.write(self.cmd_read_flash(
-                            self._cfi_start_offset - cOffset, 0x200))
+                             cOffset - self._cfi_start_offset, 0x200))
                         cOffset += 0x200
 
                     elif const._platforms[self.cChipset.Selection]["mode"] == 1:
