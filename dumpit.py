@@ -117,7 +117,7 @@ class ForwardApp(forwardDialog.forwardDialog):
         if self._ws_parent._debug_logs:
             print(f"EXEC {cmd}")
         if self._ocd and self._ocd.poll() is None:
-            self._ocd.stdin.write(cmd.encode("ascii") + b"\x1a")
+            self._ocd.stdin.write(cmd.encode("latin-1") + b"\x1a")
             self._ocd.stdin.flush()
 
             resTemp = bytearray()
@@ -128,7 +128,7 @@ class ForwardApp(forwardDialog.forwardDialog):
 
                 resTemp += t
 
-            return resTemp.decode("ascii")
+            return resTemp.decode("latin-1")
 
         else:
             return ""
@@ -809,7 +809,7 @@ class MainApp(main.main):
         if self._debug_logs:
             print(f"EXEC {cmd}")
         if self._ocd and self._ocd.poll() is None:
-            self._ocd.stdin.write(cmd.encode("ascii") + b"\x1a")
+            self._ocd.stdin.write(cmd.encode("latin-1") + b"\x1a")
             self._ocd.stdin.flush()
 
             resTemp = bytearray()
@@ -820,7 +820,7 @@ class MainApp(main.main):
 
                 resTemp += t
 
-            return resTemp.decode("ascii")
+            return resTemp.decode("latin-1")
 
         elif self._sio and self._sio.connected:
             self._sio.emit("data", cmd)
