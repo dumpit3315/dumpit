@@ -805,7 +805,7 @@ class MainApp(main.main):
             self.bForwardRemote.Enable(True)
             self._doAnalytics("disconnect", reason=2)
 
-    def _ocdSendCommand(self, cmd: str):
+    def _ocdSendCommand(self, cmd: str, _return: bool=True):
         if self._debug_logs:
             print(f"EXEC {cmd}")
         if self._ocd and self._ocd.poll() is None:
@@ -820,11 +820,21 @@ class MainApp(main.main):
 
                 resTemp += t
 
-            return resTemp.decode("latin-1")
+            if _return: 
+                return resTemp.decode("latin-1")
+            
+            else:
+                print(f"SINK: {resTemp}")
+                return ""
 
         elif self._sio and self._sio.connected:
             self._sio.emit("data", cmd)
-            return self._sioMsgQueue.get()
+            if _return: 
+                return self._sioMsgQueue.get()
+            
+            else:
+                print(f"SINK: {self._sioMsgQueue.get()}")
+                return ""
 
         else:
             return ""
@@ -1150,7 +1160,7 @@ class MainApp(main.main):
         try:
             if self._loaded_dcc is not None:
                 self._ocdSendCommand("soft_reset_halt")
-                self._ocdSendCommand(f"load_image {self._loaded_dcc}")
+                self._ocdSendCommand(f"load_image {self._loaded_dcc}", False)
                 self._ocdSendCommand(
                     f"resume {hex(intelhex.IntelHex(self._loaded_dcc).minaddr())}")
 
