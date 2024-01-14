@@ -1080,7 +1080,7 @@ class MainApp(main.main):
                           addr_end=eOffset, is_memory=True)
 
         self._logSupressed = True
-        self._logThreadQueue.push(f"Dump memory started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
+        self._logThreadQueue.put(f"Dump memory started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
 
         try:
             with open(name, "wb") as tempFile:
@@ -1091,7 +1091,7 @@ class MainApp(main.main):
 
                     self._progMsgQueue.put(cOffset/eOffset)
 
-            self._logThreadQueue.push(f"Dump memory finished {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
+            self._logThreadQueue.put(f"Dump memory finished {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
 
         except Exception as e:
             traceback.print_exc()
@@ -1229,7 +1229,7 @@ class MainApp(main.main):
                     (5 if O1N_isDDP else 6) + ((O1N_DevID >> 4) & 0xf))
 
             self._logSupressed = True
-            self._logThreadQueue.push(f"Dump flash started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
+            self._logThreadQueue.put(f"Dump flash started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
 
             with open(name, "wb") as tempFile:
                 while cOffset < eOffset and not self._isReadCanceled:
@@ -1567,7 +1567,7 @@ class MainApp(main.main):
                     self._progMsgQueue.put(cOffset/eOffset)
 
                 tempFile.write(spareBuf + bbBuf)
-                self._logThreadQueue.push(f"Dump flash finished {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
+                self._logThreadQueue.put(f"Dump flash finished {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
                 # tempFile.write() # TODO: Write Dumpit Device Footer format
 
         except Exception as e:
