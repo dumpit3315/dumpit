@@ -2117,6 +2117,8 @@ class MainApp(main.main):
 
             cfg["tracking_count"] = _PTRACKCOUNT
             cfg["debug_log"] = self._debug_logs
+            
+            cfg["dcc_used"] = self._loaded_dcc is not None
 
             json.dump(cfg, open(os.path.join(os.path.dirname(
                 __file__), "dumpit_config.json"), "w"), indent=4)
