@@ -1336,6 +1336,7 @@ class MainApp(main.main):
             if self._loaded_dcc is not None:
                 self._ocdSendCommand("soft_reset_halt")                
                 self._ocdSendCommand(f"load_image $_DCC_PATH", False)
+                self._ocdSendCommand("arm core_state arm")
                 self._ocdSendCommand(
                     f"resume $_DCC_START_OFFSET")
 
