@@ -75,7 +75,7 @@ def doTrackThread(user_id, action, openocd_version, config, **kwargs):
             **kwargs
         }, timeout=5)
         
-        assert res.status_code >= 200 and res.status_code <= 299
+        assert res.status_code >= 200 and res.status_code <= 299, f"{res.status_code} {res.reason}"
         _PTRACKING.put(action)
 
     except Exception:
