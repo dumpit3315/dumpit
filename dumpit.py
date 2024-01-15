@@ -1049,6 +1049,7 @@ class MainApp(main.main):
             if res["error"]:
                 raise Exception(res["error"])
                         
+            self.status.Value = ""
             self._logThreadQueue = queue.Queue()
             self._sioMsgQueue = queue.Queue()
 
