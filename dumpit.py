@@ -64,7 +64,7 @@ def _msleep(dur: int):
 
 def doTrackThread(user_id, action, openocd_version, config, **kwargs):
     try:        
-        res = requests.post("https://dumpit.ucomsite.my.id/analytics/track", {
+        res = requests.post("https://dumpit.ucomsite.my.id/analytics/track", json={
             "user_id": user_id,
             "action": action,
             "dumpit_version": const.DUMPIT_VERSION,
