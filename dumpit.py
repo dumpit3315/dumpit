@@ -18,7 +18,7 @@ import re
 import libfindit
 import traceback
 import json
-from urllib import request
+import requests
 import gc
 import uuid
 import platform
@@ -63,8 +63,8 @@ def _msleep(dur: int):
 
 
 def doTrackThread(user_id, action, openocd_version, config, **kwargs):
-    try:
-        req = request.Request("https://dumpit.ucomsite.my.id/analytics/track", data=json.dumps({
+    try:        
+        res = requests.post("https://dumpit.ucomsite.my.id/analytics/track", {
             "user_id": user_id,
             "action": action,
             "dumpit_version": const.DUMPIT_VERSION,
@@ -73,11 +73,10 @@ def doTrackThread(user_id, action, openocd_version, config, **kwargs):
             "os": f"{platform.system()} {platform.version()}",
             "config": config,
             **kwargs
-        }).encode("utf-8"), headers={"Content-Type": "application/json"}, method="POST")
-
-        with request.urlopen(req, timeout=5) as res:
-            assert res.getcode() >= 200 and res.getcode() <= 299
-            _PTRACKING.put(action)
+        }, timeout=5)
+        
+        assert res.status_code >= 200 and res.status_code <= 299
+        _PTRACKING.put(action)
 
     except Exception:
         if True:
