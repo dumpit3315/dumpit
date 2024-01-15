@@ -255,6 +255,16 @@ class main ( wx.Frame ):
 
 		bSizer5.Add( bSizer6111111, 1, wx.EXPAND, 5 )
 
+		lCurrentLoader = wx.BoxSizer( wx.VERTICAL )
+
+		self.lCurrentDCC = wx.StaticText( self.dPage1, wx.ID_ANY, u"DCC Loader: None", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.lCurrentDCC.Wrap( -1 )
+
+		lCurrentLoader.Add( self.lCurrentDCC, 0, wx.ALL, 5 )
+
+
+		bSizer5.Add( lCurrentLoader, 0, wx.EXPAND, 5 )
+
 		bSizer60 = wx.BoxSizer( wx.VERTICAL )
 
 		self.tOCDCmd = wx.TextCtrl( self.dPage1, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, wx.TE_PROCESS_ENTER )

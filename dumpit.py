@@ -84,7 +84,7 @@ def doTrackThread(user_id, action, openocd_version, config, **kwargs):
             print("unable to track:")
             traceback.print_exc()
 
-
+'''
 class ForwardApp(forwardDialog.forwardDialog):
     def __init__(self, parent, token):
         super().__init__(parent)
@@ -203,6 +203,61 @@ class ForwardApp(forwardDialog.forwardDialog):
                     self._ws_parent._sio.disconnect()
 
     def doStop(self, event):
+        self._ws_parent._sio.emit("bye")
+        self._ws_parent._sio.disconnect()
+'''
+
+class ForwardApp(forwardDialog.forwardDialog):
+    def __init__(self, parent, token):
+        super().__init__(parent)
+        self._ws_parent: MainApp = parent
+
+        self.tPin.SetValue(token)
+        self.status.Value = ""
+
+        self._wsThreadQueue = queue.Queue()
+        
+        self._wsThread = threading.Thread(target=self._doWSLoop)
+        self._wsThread.daemon = True
+
+        self._loop_running = True
+        self._wsThread.start()
+
+    def _doWSLoop(self):
+        while self._loop_running:
+            try:
+                self._wsThreadQueue.put(self._ws_parent._sio.receive(0))
+
+            except socketio.exceptions.TimeoutError:
+                pass
+
+            except Exception:
+                break
+
+    def doLoop(self, event):
+        try:
+            if not self._ws_parent._sio.connected:
+                self._ws_parent._doAnalytics("disconnect", reason=1)
+
+                self.Unbind(wx.EVT_IDLE)
+                self._loop_running = False
+                return self.EndModal(0)
+
+            q = self._wsThreadQueue.get_nowait()
+
+            if q[0] == "forward_client_connected":
+                self.Unbind(wx.EVT_IDLE)
+                self._loop_running = False
+                return self.EndModal(1)
+            
+            elif q[1] == "bye":
+                #print("bye event")
+                self._ws_parent._sio.disconnect()
+
+        except queue.Empty:
+            pass        
+
+    def doStop(self, event):        
         self._ws_parent._sio.emit("bye")
         self._ws_parent._sio.disconnect()
 
@@ -520,6 +575,7 @@ class MainApp(main.main):
         ''' Start dumpit stuff '''
         self._isConnect = False
         self._isConnectRemote = False
+        self._isForward = False
 
         self._ocd = None
         self._sio = None
@@ -532,6 +588,7 @@ class MainApp(main.main):
         self._errMsgQueue = None
         self._progMsgQueue = None
         self._btnMsgQueue = None
+        self._pong_flag = threading.Event()
 
         self._dumpThread = None
 
@@ -721,6 +778,7 @@ class MainApp(main.main):
             try:
                 if not self._logSupressed:
                     self._logThreadQueue.put(l.decode("utf-8"))
+                    if self._isForward: self._sio.emit("log", l.decode("utf-8"))
 
             except Exception:
                 pass
@@ -733,8 +791,45 @@ class MainApp(main.main):
                 if p[0] == "data":
                     self._sioMsgQueue.put(p[1])
 
-                elif p[0] == "log" and not self._isRead:
+                elif p[0] == "log" and not self._logSupressed:
                     self._logThreadQueue.put(p[1])
+                    
+                elif p[0] == "bye":
+                    #print("bye event")
+                    self._sio.disconnect()
+                
+                elif p[0] == "ping_remote":
+                    self._sio.emit("pong_remote")
+                    
+                elif p[0] == "pong_remote":
+                    self._pong_flag.set()
+
+            except socketio.exceptions.TimeoutError:
+                pass
+
+            except Exception:
+                pass
+            
+    def _doWSLoop_Forward(self):
+        while self._ocd and self._ocd.poll() is None:
+            try:
+                p = self._sio.receive(0)
+
+                if p[0] == "data":
+                    self._sio.emit("data", self._ocdSendCommand(p[1]))
+                    
+                elif p[0] == "command":
+                    pass
+                
+                elif p[0] == "bye":
+                    #print("bye event")
+                    self._sio.disconnect()
+                    
+                elif p[0] == "ping_remote":
+                    self._sio.emit("pong_remote")
+                    
+                elif p[0] == "pong_remote":
+                    self._pong_flag.set()
 
             except socketio.exceptions.TimeoutError:
                 pass
@@ -798,12 +893,18 @@ class MainApp(main.main):
             except queue.Empty:
                 pass
 
-        if self._ocd and self._isConnect and self._ocd.poll() is not None:
+        if self._isForward and self._ocd and self._isConnect and self._ocd.poll() is not None:
+            self._sio.emit("bye")
+            self._sio.disconnect()
+            self._isConnect = False
+            self._isForward = False
+
+        if self._ocd and self._isConnect and self._ocd.poll() is not None and not self._isForward:
             self._isConnect = False
             self.bConnect.Label = "Connect"
             self.bConnectRemote.Enable(True)
             self.bForwardRemote.Enable(True)
-            self._doAnalytics("disconnect", reason=1)
+            self._doAnalytics("disconnect", reason=1)            
 
         if self._sio and self._isConnectRemote and not self._sio.connected:
             self._isConnectRemote = False
@@ -811,10 +912,17 @@ class MainApp(main.main):
             self.bConnectRemote.Enable(True)
             self.bForwardRemote.Enable(True)
             self._doAnalytics("disconnect", reason=2)
+            
+            if self._isForward and self._ocd and self._isConnect and self._ocd.poll() is None:
+                self._ocd.terminate()
+                self._isConnect = False
+                self._isForward = False
+                        
 
     def _ocdSendCommand(self, cmd: str, _return: bool=True):
         if self._debug_logs:
             print(f"EXEC {cmd}")
+            
         if self._ocd and self._ocd.poll() is None:
             self._ocd.stdin.write(cmd.encode("latin-1") + b"\x1a")
             self._ocd.stdin.flush()
@@ -837,10 +945,10 @@ class MainApp(main.main):
         elif self._sio and self._sio.connected:
             self._sio.emit("data", cmd)
             if _return: 
-                return self._sioMsgQueue.get()
+                return self._sioMsgQueue.get(timeout=10)
             
             else:
-                print(f"SINK: {self._sioMsgQueue.get()}")
+                print(f"SINK: {self._sioMsgQueue.get(timeout=10)}")
                 return ""
 
         else:
@@ -853,10 +961,20 @@ class MainApp(main.main):
             self.bConnect.Label = "Connect"
             self.bConnectRemote.Enable(True)
             self.bForwardRemote.Enable(True)
-            self._doAnalytics("disconnect", reason=0)
+            
+            if self._isForward and self._isConnectRemote:
+                self._isForward = False
+                self._isConnectRemote = False
+                
+                if self._sio and self._sio.connected:
+                    self._sio.emit("bye")
+                    self._sio.disconnect()
+            
+            self._doAnalytics("disconnect", reason=0)        
 
         elif self._isConnectRemote:
             self._isConnectRemote = False
+            
             if self._sio and self._sio.connected:
                 self._sio.emit("bye")
                 self._sio.disconnect()
@@ -878,6 +996,9 @@ class MainApp(main.main):
             # print(INIT_CMD)
 
             self._isConnect = True
+            self._isConnectRemote = False
+            self._isForward = False
+            
             self.status.Value = f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n'
             self._ocd = subprocess.Popen([getOCDExec(
             ), "-c", INIT_CMD], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -914,7 +1035,7 @@ class MainApp(main.main):
             self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith(
                 "::1") or self.bTargetRemote.Value.startswith("[::1]") else f"https://{self.bTargetRemote.Value}/", transports=["websocket"], socketio_path="dumpit_remote")
 
-            p = self._sio.receive()
+            p = self._sio.receive(5)
             if p[0] != "protocol" or p[1] != "dumpit":
                 raise Exception("Not a valid Dumpit remote protocol.")
 
@@ -925,10 +1046,10 @@ class MainApp(main.main):
 
                 return
 
-            res = self._sio.call("forward_connect", rep.GetValue())
+            res = self._sio.call("forward_connect", rep.GetValue(), timeout=5)
             if res["error"]:
                 raise Exception(res["error"])
-
+                        
             self._logThreadQueue = queue.Queue()
             self._sioMsgQueue = queue.Queue()
 
@@ -941,13 +1062,12 @@ class MainApp(main.main):
 
             self._sioThread.start()
 
-            self._isConnectRemote = True
+            self._isConnectRemote = True         
+            self._isForward = False   
 
             self.bConnect.Label = "Disconnect"
             self.bConnectRemote.Enable(False)
-            self.bForwardRemote.Enable(False)
-
-            self._doAnalytics("idcode", idcode=self.cmd_get_idcode())
+            self.bForwardRemote.Enable(False)            
 
         except Exception as e:
             if self._sio and self._sio.connected:
@@ -961,17 +1081,65 @@ class MainApp(main.main):
 
     def doForwardRemote(self, event):
         try:
+            if self._sio:
+                self._sio.disconnect()
+            
             self._sio = socketio.SimpleClient()
+            gc.collect()
 
             self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith(
                 "::1") or self.bTargetRemote.Value.startswith("[::1]") else f"https://{self.bTargetRemote.Value}/", transports=["websocket"], socketio_path="dumpit_remote")
 
-            p = self._sio.receive()
+            p = self._sio.receive(5)
             if p[0] != "protocol" or p[1] != "dumpit":
-                raise Exception("Not a valid Dumpit remote protocol.")
+                raise Exception("Not a valid Dumpit remote protocol.")            
 
-            token = self._sio.call("forward_request")
-            return ForwardApp(self, token["token"]).ShowModal()
+            token = self._sio.call("forward_request", timeout=5)
+            forward_wait = ForwardApp(self, token["token"]).ShowModal()
+            if forward_wait:
+                if self._ocd and self._ocd.poll() is None:
+                    self._ocd.kill()
+                    
+                gc.collect()
+
+                INIT_CMD = getInitCmd(self)
+
+                self._doAnalytics("connect", type=1)
+
+                # print(INIT_CMD)
+
+                self._isConnect = True
+                self._isForward = True
+                self._isConnectRemote = True
+                
+                self.status.Value = f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n'
+                self._sio.emit("log", f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n')
+                
+                self._ocd = subprocess.Popen([getOCDExec(
+                ), "-c", INIT_CMD], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                self._ocdSendCommand("")
+
+                self._logThreadQueue = queue.Queue()
+                self._sioMsgQueue = queue.Queue()
+
+                self._errMsgQueue = queue.Queue()
+                self._progMsgQueue = queue.Queue()
+                self._btnMsgQueue = queue.Queue()
+
+                self._logThread = threading.Thread(target=self._doLogging)
+                self._logThread.daemon = True
+
+                self._sioThread = threading.Thread(target=self._doWSLoop_Forward)
+                
+                self._logThread.start()
+                self._sioThread.start()
+
+                self.bConnect.Label = "Disconnect"
+                self.bConnectRemote.Enable(False)
+                self.bForwardRemote.Enable(False)
+
+                self._doAnalytics("idcode", idcode=self.cmd_get_idcode())
 
         except Exception as e:
             if self._sio and self._sio.connected:
@@ -1682,10 +1850,12 @@ class MainApp(main.main):
     def doLoader(self, event):
         with wx.FileDialog(self, "Load DCC", wildcard="DCC Hex file|*.hex", style=wx.FD_OPEN) as fd:
             fd: wx.FileDialog
-            if fd.ShowModal() != wx.ID_CANCEL:
+            if fd.ShowModal() != wx.ID_CANCEL:                
                 self._loaded_dcc = fd.GetPath()
-            else:
+            else:                
                 self._loaded_dcc = None
+                
+            self.lCurrentDCC.SetLabel(f"DCC Loader: {self._loaded_dcc}")
 
     def doScript(self, event):
         event.Skip()
@@ -1873,6 +2043,12 @@ class MainApp(main.main):
             if self._isConnect:
                 self._isConnect = False
                 self._ocd.terminate()
+                if self._isForward and self._isConnectRemote:
+                    self._isConnectRemote = False
+                    self._isForward = False
+                    if self._sio and self._sio.connected:
+                        self._sio.emit("bye")
+                        self._sio.disconnect()
 
             elif self._isConnectRemote:
                 self._isConnectRemote = False
