@@ -899,6 +899,8 @@ class MainApp(main.main):
     def doLoop(self, event):
         global _PTRACKCOUNT
 
+        if self._isConnect or self._isConnectRemote: event.RequestMore()
+
         try:
             track = _PTRACKING.get_nowait()
             if track not in _PTRACKCOUNT:
@@ -983,10 +985,7 @@ class MainApp(main.main):
             #self.bReconnectRemote.Hide()
             #self.bForwardRemote.Show()
             
-            self.Layout()
-            
-        event.RequestMore()
-                        
+            self.Layout()                    
 
     def _ocdSendCommand(self, cmd: str, _return: bool=True):
         if self._debug_logs:
