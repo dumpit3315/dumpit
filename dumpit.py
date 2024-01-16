@@ -237,9 +237,10 @@ class ForwardApp(forwardDialog.forwardDialog):
         try:
             if not self._ws_parent._sio.connected:
                 self._ws_parent._doAnalytics("disconnect", reason=1)
-
-                self.Unbind(wx.EVT_IDLE)
+                self.Unbind(wx.EVT_IDLE)                
                 self._loop_running = False
+
+                self._wsThread.join()
                 return self.EndModal(0)
 
             q = self._wsThreadQueue.get_nowait()
@@ -247,6 +248,8 @@ class ForwardApp(forwardDialog.forwardDialog):
             if q[0] == "forward_client_connected":
                 self.Unbind(wx.EVT_IDLE)
                 self._loop_running = False
+
+                self._wsThread.join()
                 return self.EndModal(1)
             
             elif q[1] == "bye":
@@ -810,7 +813,7 @@ class MainApp(main.main):
                 pass
             
     def _doWSLoop_Forward(self):
-        while self._ocd and self._ocd.poll() is None:
+        while self._ocd.poll() is None and self._sio.connected:
             try:
                 p = self._sio.receive(1)
 
@@ -1026,6 +1029,8 @@ class MainApp(main.main):
             if self._sio:
                 self._sio.disconnect()
 
+            self._sioThread.join()
+
             self._sio = socketio.SimpleClient()
             gc.collect()
 
@@ -1083,6 +1088,8 @@ class MainApp(main.main):
         try:
             if self._sio:
                 self._sio.disconnect()
+
+            self._sioThread.join()
             
             self._sio = socketio.SimpleClient()
             gc.collect()
