@@ -1029,7 +1029,7 @@ class MainApp(main.main):
             if self._sio:
                 self._sio.disconnect()
 
-            self._sioThread.join()
+            if self._sioThread: self._sioThread.join()
 
             self._sio = socketio.SimpleClient()
             gc.collect()
@@ -1089,7 +1089,7 @@ class MainApp(main.main):
             if self._sio:
                 self._sio.disconnect()
 
-            self._sioThread.join()
+            if self._sioThread: self._sioThread.join()
             
             self._sio = socketio.SimpleClient()
             gc.collect()
