@@ -104,7 +104,7 @@ class ForwardApp(forwardDialog.forwardDialog):
     def _doWSLoop(self):
         while True:
             try:
-                self._wsThreadQueue.put(self._ws_parent._sio.receive(0))
+                self._wsThreadQueue.put(self._ws_parent._sio.receive(0.5))
 
             except socketio.exceptions.TimeoutError:
                 pass
@@ -225,7 +225,7 @@ class ForwardApp(forwardDialog.forwardDialog):
     def _doWSLoop(self):
         while self._loop_running:
             try:
-                self._wsThreadQueue.put(self._ws_parent._sio.receive(0))
+                self._wsThreadQueue.put(self._ws_parent._sio.receive(0.5))
 
             except socketio.exceptions.TimeoutError:
                 pass
@@ -785,7 +785,7 @@ class MainApp(main.main):
     def _doWSLoop(self):
         while self._sio.connected:
             try:
-                p = self._sio.receive(0)
+                p = self._sio.receive(0.5)
 
                 if p[0] == "data":
                     self._sioMsgQueue.put(p[1])
@@ -812,7 +812,7 @@ class MainApp(main.main):
     def _doWSLoop_Forward(self):
         while self._ocd and self._ocd.poll() is None:
             try:
-                p = self._sio.receive(0)
+                p = self._sio.receive(0.5)
 
                 if p[0] == "data":
                     self._sio.emit("data", self._ocdSendCommand(p[1]))
