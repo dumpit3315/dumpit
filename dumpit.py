@@ -591,6 +591,11 @@ class MainApp(main.main):
         self._progMsgQueue = None
         self._btnMsgQueue = None
         self._pong_flag = threading.Event()
+        self._timeout_flag = threading.Event()
+
+        self._next_ping = 0
+        self._next_timeout = 0
+        self._reconnect_token = None
 
         self._dumpThread = None
 
@@ -1062,6 +1067,9 @@ class MainApp(main.main):
             self._progMsgQueue = queue.Queue()
             self._btnMsgQueue = queue.Queue()
 
+            self._pong_flag.clear()
+            self._timeout_flag.clear()
+
             self._sioThread = threading.Thread(target=self._doWSLoop)
             self._sioThread.daemon = True
 
@@ -1133,6 +1141,9 @@ class MainApp(main.main):
                 self._errMsgQueue = queue.Queue()
                 self._progMsgQueue = queue.Queue()
                 self._btnMsgQueue = queue.Queue()
+
+                self._pong_flag.clear()
+                self._timeout_flag.clear()
 
                 self._logThread = threading.Thread(target=self._doLogging)
                 self._logThread.daemon = True
