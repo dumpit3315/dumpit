@@ -164,7 +164,7 @@ class ForwardApp(forwardDialog.forwardDialog):
                 self.status.Show()
                 self.status.Value = f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n'
 
-                self.Sizer.Layout()
+                self.Layout()
 
                 self._isConnect = True
                 self._ocd = subprocess.Popen([getOCDExec(
@@ -198,11 +198,11 @@ class ForwardApp(forwardDialog.forwardDialog):
 
             except queue.Empty:
                 if self._ocd.poll() is not None:
-                    self._ws_parent._sio.emit("bye")
+                    self._ws_parent._sio.call("bye", "", timeout=30)
                     self._ws_parent._sio.disconnect()
 
     def doStop(self, event):
-        self._ws_parent._sio.emit("bye")
+        self._ws_parent._sio.call("bye", "", timeout=30)
         self._ws_parent._sio.disconnect()
 '''
 
@@ -249,6 +249,8 @@ class ForwardApp(forwardDialog.forwardDialog):
                 self.Unbind(wx.EVT_IDLE)
                 self._loop_running = False
 
+                self._ws_parent._reconnect_token = q[1]["reconnect_token"]
+
                 self._wsThread.join()
                 return self.EndModal(1)
             
@@ -260,7 +262,10 @@ class ForwardApp(forwardDialog.forwardDialog):
             pass        
 
     def doStop(self, event):        
-        self._ws_parent._sio.emit("bye")
+        try:
+            self._ws_parent._sio.call("bye", "", timeout=30)
+        except Exception:
+            pass
         self._ws_parent._sio.disconnect()
 
 class FT232HConfig(ft232h_pinconfig.FT232H_Pin_Config):
@@ -276,7 +281,7 @@ class FT232HConfig(ft232h_pinconfig.FT232H_Pin_Config):
             const._ft232h_boards[self.c_Board.Selection][1], wx.BITMAP_TYPE_ANY)
         self.isFlip = const._ft232h_boards[self.c_Board.Selection][2]
 
-        self.Sizer.Layout()
+        self.Layout()
         self.setupPins()
 
     def setupPins(self):
@@ -358,7 +363,7 @@ class FT232HConfig(ft232h_pinconfig.FT232H_Pin_Config):
             const._ft232h_boards[self.c_Board.Selection][1], wx.BITMAP_TYPE_ANY)
         self.isFlip = const._ft232h_boards[self.c_Board.Selection][2]
 
-        self.Sizer.Layout()
+        self.Layout()
         self.setupPins()
 
     def doApply(self, events):
@@ -478,7 +483,7 @@ class FT232RConfig(ft232r_pinconfig.FT232R_Pin_Config):
 
         self.board.Bitmap = wx.Bitmap(
             const._ft232r_boards[self.c_Board.Selection][1], wx.BITMAP_TYPE_ANY)
-        self.Sizer.Layout()
+        self.Layout()
 
         self.cfg_tdi.Selection = self.base_parent._ft232r_tdi
         self.cfg_tdo.Selection = self.base_parent._ft232r_tdo
@@ -493,7 +498,7 @@ class FT232RConfig(ft232r_pinconfig.FT232R_Pin_Config):
     def doChangeBoard(self, event):
         self.board.Bitmap = wx.Bitmap(
             const._ft232r_boards[self.c_Board.Selection][1], wx.BITMAP_TYPE_ANY)
-        self.Sizer.Layout()
+        self.Layout()
 
     def doApply(self, events):
         for e, x in enumerate(self.pin_layout):
@@ -523,6 +528,8 @@ class MainApp(main.main):
         print("Dumpit started")
         self.status.Value = ""
         self.finderStatus.Value = ""
+        self.sInfo.Value = ""
+        
         for i, n in const._interfaces:
             self.cInterface.Append(i)
 
@@ -596,6 +603,8 @@ class MainApp(main.main):
         self._next_ping = 0
         self._next_timeout = 0
         self._reconnect_token = None
+        
+        self._reconnecting = False
 
         self._dumpThread = None
 
@@ -791,7 +800,7 @@ class MainApp(main.main):
                 pass
 
     def _doWSLoop(self):
-        while self._sio.connected:
+        while self._sio.connected or self._reconnecting:
             try:
                 p = self._sio.receive(1)
 
@@ -818,7 +827,7 @@ class MainApp(main.main):
                 pass
             
     def _doWSLoop_Forward(self):
-        while self._ocd.poll() is None and self._sio.connected:
+        while (self._ocd.poll() is None and self._sio.connected) or self._reconnecting:
             try:
                 p = self._sio.receive(1)
 
@@ -901,8 +910,11 @@ class MainApp(main.main):
                 pass
 
         if self._isForward and self._ocd and self._isConnect and self._ocd.poll() is not None:
-            self._sio.emit("bye")
-            self._sio.disconnect()
+            try:
+                self._sio.call("bye", "", timeout=30)
+            except Exception:
+                pass
+            self._sio.disconnect()                                
             self._isConnect = False
             self._isForward = False
 
@@ -924,6 +936,11 @@ class MainApp(main.main):
                 self._ocd.terminate()
                 self._isConnect = False
                 self._isForward = False
+                
+            #self.bReconnectRemote.Hide()
+            #self.bForwardRemote.Show()
+            
+            self.Layout()
                         
 
     def _ocdSendCommand(self, cmd: str, _return: bool=True):
@@ -974,8 +991,16 @@ class MainApp(main.main):
                 self._isConnectRemote = False
                 
                 if self._sio and self._sio.connected:
-                    self._sio.emit("bye")
+                    try:
+                        self._sio.call("bye", "", timeout=30)
+                    except Exception:
+                        pass
                     self._sio.disconnect()
+                    
+                    #self.bReconnectRemote.Hide()
+                    #self.bForwardRemote.Show()
+                    
+                    self.Layout()
             
             self._doAnalytics("disconnect", reason=0)        
 
@@ -983,8 +1008,16 @@ class MainApp(main.main):
             self._isConnectRemote = False
             
             if self._sio and self._sio.connected:
-                self._sio.emit("bye")
+                try:
+                    self._sio.call("bye", "", timeout=30)
+                except Exception:
+                    pass
                 self._sio.disconnect()
+                
+                #self.bReconnectRemote.Hide()
+                #self.bForwardRemote.Show()
+                
+                self.Layout()
 
             self.bConnect.Label = "Connect"
             self.bConnectRemote.Enable(True)
@@ -1029,6 +1062,33 @@ class MainApp(main.main):
 
             self._doAnalytics("idcode", idcode=self.cmd_get_idcode())
 
+    def doReconnectRemote(self, event):
+        if not self._isConnectRemote: return
+        
+        self._reconnecting = True
+        try:
+            self._sio.disconnect()
+            
+            self._sio = socketio.SimpleClient()
+            gc.collect()
+            
+            self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith(
+                    "::1") or self.bTargetRemote.Value.startswith("[::1]") else f"https://{self.bTargetRemote.Value}/", transports=["websocket"], socketio_path="dumpit_remote")
+            
+            p = self._sio.receive(5)
+            if p[0] != "protocol" or p[1] != "dumpit":
+                raise Exception("Not a valid Dumpit remote protocol.")            
+
+            res = self._sio.call("forward_reconnect", self._reconnect_token, timeout=5)
+            if res["error"]:
+                raise Exception(res["error"])
+            
+            self._reconnect_token = res["reconnect_token"]
+            self._logThreadQueue.put("Reconnected to the remote.")
+            
+        finally:
+            self._reconnecting = False
+
     def doConnectRemote(self, event):
         try:
             if self._sio:
@@ -1050,7 +1110,10 @@ class MainApp(main.main):
 
             rep = wx.TextEntryDialog(self, "Enter interface token")
             if rep.ShowModal() == wx.ID_CANCEL:
-                self._sio.emit("bye")
+                try:
+                    self._sio.call("bye", "", timeout=30)
+                except Exception:
+                    pass
                 self._sio.disconnect()
 
                 return
@@ -1058,6 +1121,13 @@ class MainApp(main.main):
             res = self._sio.call("forward_connect", rep.GetValue(), timeout=5)
             if res["error"]:
                 raise Exception(res["error"])
+            
+            self._reconnect_token = res["reconnect_token"]
+            
+            #self.bReconnectRemote.Show()
+            #self.bForwardRemote.Hide()            
+            
+            self.Layout()            
                         
             self.status.Value = ""
             self._logThreadQueue = queue.Queue()
@@ -1084,7 +1154,10 @@ class MainApp(main.main):
 
         except Exception as e:
             if self._sio and self._sio.connected:
-                self._sio.emit("bye")
+                try:
+                    self._sio.call("bye", "", timeout=30)
+                except Exception:
+                    pass
                 self._sio.disconnect()
 
             self._doAnalytics("error", error=str(
@@ -1112,6 +1185,11 @@ class MainApp(main.main):
             token = self._sio.call("forward_request", timeout=5)
             forward_wait = ForwardApp(self, token["token"]).ShowModal()
             if forward_wait:
+                #self.bReconnectRemote.Show()
+                #self.bForwardRemote.Hide()
+                
+                self.Layout()
+                
                 if self._ocd and self._ocd.poll() is None:
                     self._ocd.kill()
                     
@@ -1161,7 +1239,10 @@ class MainApp(main.main):
 
         except Exception as e:
             if self._sio and self._sio.connected:
-                self._sio.emit("bye")
+                try:
+                    self._sio.call("bye", "", timeout=30)
+                except Exception:
+                    pass
                 self._sio.disconnect()
 
             self._doAnalytics("error", error=str(
@@ -1934,7 +2015,7 @@ class MainApp(main.main):
 
         self.analytics_stat.Value = temp_analytics
 
-        self.Sizer.Layout()
+        self.Layout()
 
     def doOpenFT232RConfig(self, event):
         FT232RConfig(self).ShowModal()
@@ -2066,13 +2147,19 @@ class MainApp(main.main):
                     self._isConnectRemote = False
                     self._isForward = False
                     if self._sio and self._sio.connected:
-                        self._sio.emit("bye")
+                        try:
+                            self._sio.call("bye", "", timeout=30)
+                        except Exception:
+                            pass
                         self._sio.disconnect()
 
             elif self._isConnectRemote:
                 self._isConnectRemote = False
                 if self._sio and self._sio.connected:
-                    self._sio.emit("bye")
+                    try:
+                        self._sio.call("bye", "", timeout=30)
+                    except Exception:
+                        pass
                     self._sio.disconnect()
 
             cfg = {}

@@ -18,14 +18,14 @@ import wx.richtext
 class main ( wx.Frame ):
 
 	def __init__( self, parent ):
-		wx.Frame.__init__ ( self, parent, id = wx.ID_ANY, title = u"Dumpit", pos = wx.DefaultPosition, size = wx.Size( 1000,600 ), style = wx.DEFAULT_FRAME_STYLE|wx.TAB_TRAVERSAL )
+		wx.Frame.__init__ ( self, parent, id = wx.ID_ANY, title = u"Dumpit", pos = wx.DefaultPosition, size = wx.Size( 1100,600 ), style = wx.DEFAULT_FRAME_STYLE|wx.TAB_TRAVERSAL )
 
 		self.SetSizeHints( wx.DefaultSize, wx.DefaultSize )
 
 		bSizer1 = wx.BoxSizer( wx.HORIZONTAL )
 
 		self.status = wx.richtext.RichTextCtrl( self, wx.ID_ANY, u"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean ac libero vel massa tristique ullamcorper ac et quam. Nunc ultricies dui nibh, ac auctor augue pulvinar sit amet. Nulla malesuada, arcu eu aliquet semper, leo est tincidunt ante, id aliquet tortor leo vel ex. Suspendisse orci lorem, molestie in auctor in, lacinia a felis. Nam molestie sagittis rutrum. Pellentesque tellus mi, posuere sed bibendum quis, laoreet a dui. In vehicula feugiat est, sit amet pellentesque neque porta sit amet. Nam in elit malesuada, imperdiet dolor eu, maximus elit.\n\nDuis tincidunt ante at massa ornare, in vehicula dolor bibendum. Integer eu est interdum, malesuada ex id, rhoncus lectus. Nullam elementum orci in tellus vestibulum porttitor. Etiam vel lectus aliquet, iaculis erat ac, convallis tortor. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Sed bibendum ultrices tempus. Cras diam felis, sodales a lacinia non, rutrum sit amet nisl. Cras dapibus, ex vitae fringilla convallis, mi lacus faucibus lorem, a aliquam ligula orci in quam. Fusce eu erat maximus, volutpat mauris quis, egestas dolor.\n\nPellentesque elementum ultrices dignissim. Integer bibendum elementum auctor. Nulla facilisi. Integer tristique bibendum facilisis. Morbi id risus molestie, tempor diam non, dignissim mauris. In sit amet orci id tellus fringilla cursus. Nam rhoncus lectus a nibh congue, at fermentum elit accumsan. Proin congue nunc velit, at tempor arcu vulputate vitae. Aenean ac diam quis neque gravida ullamcorper. Pellentesque ac erat ex.\n\nMauris lectus risus, consequat quis eros vitae, feugiat fermentum purus. Aenean risus ipsum, dignissim quis consectetur hendrerit, ultrices sed velit. Duis maximus massa tellus, at blandit elit fringilla nec. Ut luctus facilisis mi, non vehicula lorem sagittis vel. Morbi gravida lacus eu sapien condimentum gravida. Vestibulum consectetur auctor est ac efficitur. Aliquam aliquam commodo nibh. Proin ultricies porttitor arcu id accumsan. Maecenas quam eros, egestas vitae fermentum laoreet, efficitur at lacus.\n\nCurabitur id erat eu sapien volutpat ullamcorper. Nulla volutpat dignissim varius. Duis vulputate imperdiet tincidunt. Aenean in leo feugiat, rhoncus erat quis, sollicitudin sapien. Vivamus imperdiet turpis sit amet velit tristique, in dictum dolor pharetra. Duis efficitur magna nec hendrerit congue. In vel luctus purus. ", wx.DefaultPosition, wx.DefaultSize, wx.TE_READONLY|wx.VSCROLL|wx.HSCROLL|wx.NO_BORDER|wx.WANTS_CHARS )
-		self.status.SetMinSize( wx.Size( 220,-1 ) )
+		self.status.SetMinSize( wx.Size( 320,-1 ) )
 
 		bSizer1.Add( self.status, 0, wx.ALL|wx.EXPAND, 5 )
 
@@ -56,7 +56,7 @@ class main ( wx.Frame ):
 		bSizer6.Add( self.nSpeed, 1, wx.ALL, 5 )
 
 
-		bSizer5.Add( bSizer6, 0, wx.EXPAND, 5 )
+		bSizer5.Add( bSizer6, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.EXPAND, 5 )
 
 		bSizer61 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -106,7 +106,7 @@ class main ( wx.Frame ):
 		bSizer61.Add( self.nIR, 0, wx.ALL, 5 )
 
 
-		bSizer5.Add( bSizer61, 0, wx.EXPAND, 5 )
+		bSizer5.Add( bSizer61, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
 
 		bSizer611 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -134,7 +134,7 @@ class main ( wx.Frame ):
 		bSizer611.Add( self.bSkipInit, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 
-		bSizer5.Add( bSizer611, 0, wx.EXPAND, 5 )
+		bSizer5.Add( bSizer611, 0, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 
 		bSizer6111 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -171,7 +171,7 @@ class main ( wx.Frame ):
 		bSizer6111.Add( self.bBadBlockinData, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 
-		bSizer5.Add( bSizer6111, 0, wx.EXPAND, 5 )
+		bSizer5.Add( bSizer6111, 0, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 
 		bSizer611112 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -184,21 +184,29 @@ class main ( wx.Frame ):
 		self.bForwardRemote = wx.Button( self.dPage1, wx.ID_ANY, u"Forward to Remote", wx.DefaultPosition, wx.DefaultSize, 0 )
 		bSizer611112.Add( self.bForwardRemote, 0, wx.ALL, 5 )
 
+		self.bReconnectRemote = wx.Button( self.dPage1, wx.ID_ANY, u"Reconnect to Remote", wx.DefaultPosition, wx.DefaultSize, 0 )
+		bSizer611112.Add( self.bReconnectRemote, 0, wx.ALL, 5 )
+
+
+		bSizer5.Add( bSizer611112, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
+
+		bSizer6111121 = wx.BoxSizer( wx.HORIZONTAL )
+
 		self.lTargetRemote = wx.StaticText( self.dPage1, wx.ID_ANY, u"Address:", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.lTargetRemote.Wrap( -1 )
 
-		bSizer611112.Add( self.lTargetRemote, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+		bSizer6111121.Add( self.lTargetRemote, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 		self.bTargetRemote = wx.TextCtrl( self.dPage1, wx.ID_ANY, u"dumpit.ucomsite.my.id", wx.DefaultPosition, wx.DefaultSize, 0 )
-		bSizer611112.Add( self.bTargetRemote, 1, wx.ALL, 5 )
+		bSizer6111121.Add( self.bTargetRemote, 1, wx.ALL, 5 )
 
 		self.bUseGDB = wx.CheckBox( self.dPage1, wx.ID_ANY, u"Use GDB", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.bUseGDB.Enable( False )
 
-		bSizer611112.Add( self.bUseGDB, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+		bSizer6111121.Add( self.bUseGDB, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 
-		bSizer5.Add( bSizer611112, 0, wx.EXPAND, 5 )
+		bSizer5.Add( bSizer6111121, 0, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 
 		bSizer61111 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -214,7 +222,7 @@ class main ( wx.Frame ):
 		bSizer61111.Add( self.bStop, 1, wx.ALL, 5 )
 
 
-		bSizer5.Add( bSizer61111, 0, wx.EXPAND, 5 )
+		bSizer5.Add( bSizer61111, 0, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 
 		bSizer611111 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -239,7 +247,7 @@ class main ( wx.Frame ):
 		bSizer611111.Add( self.bExecLoader, 1, wx.ALL, 5 )
 
 
-		bSizer5.Add( bSizer611111, 0, wx.EXPAND, 5 )
+		bSizer5.Add( bSizer611111, 0, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 
 		bSizer6111111 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -253,17 +261,20 @@ class main ( wx.Frame ):
 		bSizer6111111.Add( self.bExec, 1, wx.ALL, 5 )
 
 
-		bSizer5.Add( bSizer6111111, 1, wx.EXPAND, 5 )
+		bSizer5.Add( bSizer6111111, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.EXPAND, 5 )
 
-		lCurrentLoader = wx.BoxSizer( wx.VERTICAL )
+		bSizer61111111 = wx.BoxSizer( wx.VERTICAL )
+
+		self.sInfo = wx.richtext.RichTextCtrl( self.dPage1, wx.ID_ANY, u"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean ac libero vel massa tristique ullamcorper ac et quam. Nunc ultricies dui nibh, ac auctor augue pulvinar sit amet. Nulla malesuada, arcu eu aliquet semper, leo est tincidunt ante, id aliquet tortor leo vel ex. Suspendisse orci lorem, molestie in auctor in, lacinia a felis. Nam molestie sagittis rutrum. Pellentesque tellus mi, posuere sed bibendum quis, laoreet a dui. In vehicula feugiat est, sit amet pellentesque neque porta sit amet. Nam in elit malesuada, imperdiet dolor eu, maximus elit.\n\nDuis tincidunt ante at massa ornare, in vehicula dolor bibendum. Integer eu est interdum, malesuada ex id, rhoncus lectus. Nullam elementum orci in tellus vestibulum porttitor. Etiam vel lectus aliquet, iaculis erat ac, convallis tortor. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Sed bibendum ultrices tempus. Cras diam felis, sodales a lacinia non, rutrum sit amet nisl. Cras dapibus, ex vitae fringilla convallis, mi lacus faucibus lorem, a aliquam ligula orci in quam. Fusce eu erat maximus, volutpat mauris quis, egestas dolor.\n\nPellentesque elementum ultrices dignissim. Integer bibendum elementum auctor. Nulla facilisi. Integer tristique bibendum facilisis. Morbi id risus molestie, tempor diam non, dignissim mauris. In sit amet orci id tellus fringilla cursus. Nam rhoncus lectus a nibh congue, at fermentum elit accumsan. Proin congue nunc velit, at tempor arcu vulputate vitae. Aenean ac diam quis neque gravida ullamcorper. Pellentesque ac erat ex.\n\nMauris lectus risus, consequat quis eros vitae, feugiat fermentum purus. Aenean risus ipsum, dignissim quis consectetur hendrerit, ultrices sed velit. Duis maximus massa tellus, at blandit elit fringilla nec. Ut luctus facilisis mi, non vehicula lorem sagittis vel. Morbi gravida lacus eu sapien condimentum gravida. Vestibulum consectetur auctor est ac efficitur. Aliquam aliquam commodo nibh. Proin ultricies porttitor arcu id accumsan. Maecenas quam eros, egestas vitae fermentum laoreet, efficitur at lacus.\n\nCurabitur id erat eu sapien volutpat ullamcorper. Nulla volutpat dignissim varius. Duis vulputate imperdiet tincidunt. Aenean in leo feugiat, rhoncus erat quis, sollicitudin sapien. Vivamus imperdiet turpis sit amet velit tristique, in dictum dolor pharetra. Duis efficitur magna nec hendrerit congue. In vel luctus purus. ", wx.DefaultPosition, wx.DefaultSize, wx.TE_READONLY|wx.VSCROLL|wx.HSCROLL|wx.NO_BORDER|wx.WANTS_CHARS )
+		bSizer61111111.Add( self.sInfo, 1, wx.EXPAND |wx.ALL, 5 )
 
 		self.lCurrentDCC = wx.StaticText( self.dPage1, wx.ID_ANY, u"DCC Loader: None", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.lCurrentDCC.Wrap( -1 )
 
-		lCurrentLoader.Add( self.lCurrentDCC, 0, wx.ALL, 5 )
+		bSizer61111111.Add( self.lCurrentDCC, 0, wx.ALL, 5 )
 
 
-		bSizer5.Add( lCurrentLoader, 0, wx.EXPAND, 5 )
+		bSizer5.Add( bSizer61111111, 1, wx.EXPAND, 5 )
 
 		bSizer60 = wx.BoxSizer( wx.VERTICAL )
 
@@ -611,6 +622,7 @@ class main ( wx.Frame ):
 		self.bConnect.Bind( wx.EVT_BUTTON, self.doConnect )
 		self.bConnectRemote.Bind( wx.EVT_BUTTON, self.doConnectRemote )
 		self.bForwardRemote.Bind( wx.EVT_BUTTON, self.doForwardRemote )
+		self.bReconnectRemote.Bind( wx.EVT_BUTTON, self.doReconnectRemote )
 		self.bDumpFlash.Bind( wx.EVT_BUTTON, self.doReadFlash )
 		self.bDumpMemory.Bind( wx.EVT_BUTTON, self.doReadMemory )
 		self.bStop.Bind( wx.EVT_BUTTON, self.doStop )
@@ -658,6 +670,9 @@ class main ( wx.Frame ):
 		event.Skip()
 
 	def doForwardRemote( self, event ):
+		event.Skip()
+
+	def doReconnectRemote( self, event ):
 		event.Skip()
 
 	def doReadFlash( self, event ):
