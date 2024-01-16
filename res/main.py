@@ -113,7 +113,7 @@ class main ( wx.Frame ):
 		self.lResetMode = wx.StaticText( self.dPage1, wx.ID_ANY, u"Reset Mode:", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.lResetMode.Wrap( -1 )
 
-		bSizer611.Add( self.lResetMode, 0, wx.ALL, 5 )
+		bSizer611.Add( self.lResetMode, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 		cResetModeChoices = []
 		self.cResetMode = wx.Choice( self.dPage1, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, cResetModeChoices, 0 )
@@ -123,12 +123,10 @@ class main ( wx.Frame ):
 		self.lResetDelay = wx.StaticText( self.dPage1, wx.ID_ANY, u"Reset Delay:", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.lResetDelay.Wrap( -1 )
 
-		bSizer611.Add( self.lResetDelay, 0, wx.ALL, 5 )
+		bSizer611.Add( self.lResetDelay, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
-		cResetDelayChoices = []
-		self.cResetDelay = wx.Choice( self.dPage1, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, cResetDelayChoices, 0 )
-		self.cResetDelay.SetSelection( 0 )
-		bSizer611.Add( self.cResetDelay, 1, wx.ALL, 5 )
+		self.bResetDelay = wx.Button( self.dPage1, wx.ID_ANY, u"Configure", wx.DefaultPosition, wx.DefaultSize, 0 )
+		bSizer611.Add( self.bResetDelay, 0, wx.ALL, 5 )
 
 		self.bSkipInit = wx.CheckBox( self.dPage1, wx.ID_ANY, u"Skip Initialization", wx.DefaultPosition, wx.DefaultSize, 0 )
 		bSizer611.Add( self.bSkipInit, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
@@ -617,6 +615,7 @@ class main ( wx.Frame ):
 		self.Bind( wx.EVT_CLOSE, self.doQuit )
 		self.Bind( wx.EVT_IDLE, self.doLoop )
 		self.tab.Bind( wx.EVT_NOTEBOOK_PAGE_CHANGING, self.loadNoteBook )
+		self.bResetDelay.Bind( wx.EVT_BUTTON, self.bDoConfigureReset )
 		self.tStart.Bind( wx.EVT_TEXT, self.doHexCheck )
 		self.tEnd.Bind( wx.EVT_TEXT, self.doHexCheck )
 		self.bConnect.Bind( wx.EVT_BUTTON, self.doConnect )
@@ -657,6 +656,9 @@ class main ( wx.Frame ):
 		event.Skip()
 
 	def loadNoteBook( self, event ):
+		event.Skip()
+
+	def bDoConfigureReset( self, event ):
 		event.Skip()
 
 	def doHexCheck( self, event ):

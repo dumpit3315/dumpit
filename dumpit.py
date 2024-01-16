@@ -4,6 +4,7 @@ from res import main
 from res import forwardDialog
 from res import ft232r_pinconfig
 from res import ft232h_pinconfig
+from res import resetDelay
 import os
 import sys
 import const
@@ -260,6 +261,8 @@ class ForwardApp(forwardDialog.forwardDialog):
 
         except queue.Empty:
             pass        
+                
+        event.RequestMore()
 
     def doStop(self, event):        
         try:
@@ -518,6 +521,27 @@ class FT232RConfig(ft232r_pinconfig.FT232R_Pin_Config):
     def doCancel(self, event):
         self.EndModal(wx.ID_CANCEL)
 
+class ResetConfig(resetDelay.ResetDelayConfig):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.base_parent: MainApp = parent
+
+        self.nNTRSTWidth.Value = self.base_parent.ntrst_reset_pulse
+        self.nSRSTWidth.Value = self.base_parent.nsrst_reset_pulse
+        self.nNTRSTDelay.Value = self.base_parent.ntrst_reset_delay
+        self.nSRSTDelay.Value = self.base_parent.nsrst_reset_delay
+        self.nResetDelay.Value = self.base_parent.reset_delay
+        
+    def bDoApply( self, event ):
+        self.base_parent.ntrst_reset_pulse = self.nNTRSTWidth.Value
+        self.base_parent.nsrst_reset_pulse = self.nSRSTWidth.Value
+        self.base_parent.ntrst_reset_delay = self.nNTRSTDelay.Value
+        self.base_parent.nsrst_reset_delay = self.nSRSTDelay.Value
+        self.base_parent.reset_delay = self.nResetDelay.Value
+        self.EndModal(0)
+
+    def bDoCancel( self, event ):
+        self.EndModal(0)
 
 class MainApp(main.main):
     def __init__(self, parent):
@@ -550,20 +574,24 @@ class MainApp(main.main):
         for r, v in const._reset_type:
             self.cResetMode.Append(r)
 
-        self.cResetMode.Selection = 3
+        self.cResetMode.Selection = 2
 
+        '''
         self._resetDelays = []
 
         for e in const._reset_delays:
             for c in const._reset_delays:
                 for d in const._reset_delays:
-                    self._resetDelays.append((d, c, e))
-
-        for rt, rs, sr in self._resetDelays:
+                    for f in const._reset_delays:
+                        for g in const._reset_delays:
+                            self._resetDelays.append((d, c, e, g, f))
+        
+        for rt, rs, sr, rt_a, rs_a in self._resetDelays:
             self.cResetDelay.Append(
-                f"{rt}ms TRST / {rs}ms SRST / {sr}ms RST delay")
+                f"{rt}ms TRST / {rs}ms SRST / {sr}ms RST delay / {rt_a}ms TRST assert / {rs_a}ms SRST assert")
 
         self.cResetDelay.Selection = 0
+        '''
 
         for p in const._platforms:
             self.cChipset.Append(p["name"])
@@ -648,6 +676,14 @@ class MainApp(main.main):
         self._loaded_dcc = None
 
         self._cfi_start_offset = None
+        
+        self.ntrst_reset_delay = 50
+        self.ntrst_reset_pulse = 100
+        
+        self.nsrst_reset_delay = 50
+        self.nsrst_reset_pulse = 100
+        
+        self.reset_delay = 100
 
         if os.path.exists(os.path.join(os.path.dirname(__file__), "dumpit_config.json")):
             cfg = json.load(
@@ -658,8 +694,12 @@ class MainApp(main.main):
             self.cTarget.Selection = cfg["target"]
             self.cTap.Selection = cfg["tap"]
             self.nIR.Value = cfg["ir"]
-            self.cResetMode.Selection = cfg["reset_mode"]
-            self.cResetDelay.Selection = cfg["reset_delay"]
+            self.cResetMode.Selection = cfg["reset_mode"]            
+            self.ntrst_reset_pulse = cfg["trst_reset_pulse"]
+            self.nsrst_reset_pulse = cfg["srst_reset_pulse"]
+            self.ntrst_reset_delay = cfg["trst_reset_delay"]
+            self.nsrst_reset_delay = cfg["srst_reset_delay"]
+            self.reset_delay = cfg["reset_delay"]
             self.bSkipInit.Value = cfg["skip_init"]
             self.tStart.Value = cfg["start"]
             self.tEnd.Value = cfg["end"]
@@ -734,8 +774,11 @@ class MainApp(main.main):
             cfg["ir"] = self.nIR.Value
             cfg["reset_mode"] = self.cResetMode.GetString(
                 self.cResetMode.Selection)
-            cfg["reset_delay"] = self.cResetDelay.GetString(
-                self.cResetDelay.Selection)
+            cfg["trst_reset_pulse"] = self.ntrst_reset_pulse
+            cfg["srst_reset_pulse"] = self.nsrst_reset_pulse
+            cfg["trst_reset_delay"] = self.ntrst_reset_delay
+            cfg["srst_reset_delay"] = self.nsrst_reset_delay
+            cfg["reset_delay"] = self.reset_delay
             cfg["skip_init"] = self.bSkipInit.Value
             cfg["start"] = self.tStart.Value
             cfg["end"] = self.tEnd.Value
@@ -941,6 +984,8 @@ class MainApp(main.main):
             #self.bForwardRemote.Show()
             
             self.Layout()
+            
+        event.RequestMore()
                         
 
     def _ocdSendCommand(self, cmd: str, _return: bool=True):
@@ -1938,13 +1983,13 @@ class MainApp(main.main):
     def doReset(self, event):
         if not self._isConnect and not self._isConnectRemote:
             return
-        _msleep(self._resetDelays[self.cResetDelay.Selection][1] * 1000)
+        _msleep(self.reset_delay * 1000)
         self._ocdSendCommand("soft_reset_halt")
 
     def doHardReset(self, event):
         if not self._isConnect and not self._isConnectRemote:
             return
-        _msleep(self._resetDelays[self.cResetDelay.Selection][1] * 1000)
+        _msleep(self.reset_delay * 1000)
         self._ocdSendCommand("reset init")
 
     def doLoader(self, event):
@@ -2171,7 +2216,11 @@ class MainApp(main.main):
             cfg["tap"] = self.cTap.Selection
             cfg["ir"] = self.nIR.Value
             cfg["reset_mode"] = self.cResetMode.Selection
-            cfg["reset_delay"] = self.cResetDelay.Selection
+            cfg["trst_reset_pulse"] = self.ntrst_reset_pulse
+            cfg["srst_reset_pulse"] = self.nsrst_reset_pulse
+            cfg["trst_reset_delay"] = self.ntrst_reset_delay
+            cfg["srst_reset_delay"] = self.nsrst_reset_delay
+            cfg["reset_delay"] = self.reset_delay
             cfg["skip_init"] = self.bSkipInit.Value
             cfg["start"] = self.tStart.Value
             cfg["end"] = self.tEnd.Value
@@ -2252,6 +2301,9 @@ class MainApp(main.main):
             temp_analytics += f"{k}: {_PTRACKCOUNT[k]}\n"
 
         self.analytics_stat.Value = temp_analytics
+        
+    def bDoConfigureReset(self, event):
+        ResetConfig(self).ShowModal()
 
 
 def getInitCmd(self: MainApp):
@@ -2262,7 +2314,7 @@ def getInitCmd(self: MainApp):
         if const._ft232h_adapters[self.cFTAdapter.Selection][1] != "":
             cInit = f"{const._ft232h_adapters[self.cFTAdapter.Selection][1]} ftdi tdo_sample_edge {['rising', 'falling'][self.rSamplingEdge.Selection]};"
 
-    INIT_CMD = f"{cInit} telnet_port 0; gdb_port 0; tcl_port pipe; reset_config {const._reset_type[self.cResetMode.Selection][1]}; jtag_ntrst_delay {self._resetDelays[self.cResetDelay.Selection][0]}; adapter srst delay {self._resetDelays[self.cResetDelay.Selection][1]}; "
+    INIT_CMD = f"{cInit} telnet_port 0; gdb_port 0; tcl_port pipe; reset_config {const._reset_type[self.cResetMode.Selection][1]}; jtag_ntrst_delay {self.ntrst_reset_delay}; adapter srst delay {self.nsrst_reset_delay}; jtag_ntrst_assert_width {self.ntrst_reset_pulse}; adapter srst pulse_width {self.nsrst_reset_pulse}; "
 
     if int(self.nSpeed.Value) <= 0:
         INIT_CMD += f"jtag_rclk 1000; "
