@@ -1120,9 +1120,12 @@ class MainApp(main.main):
             self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith(
                     "::1") or self.bTargetRemote.Value.startswith("[::1]") else f"https://{self.bTargetRemote.Value}/", transports=["websocket"], socketio_path="dumpit_remote")
             
-            p = self._sio.receive(5)
-            if p[0] != "protocol" or p[1] != "dumpit":
-                raise Exception("Not a valid Dumpit remote protocol.")            
+            while True:
+                p = self._sio.receive(5)
+                if p[0] == "protocol" and p[1] != "dumpit":
+                    raise Exception("Not a valid Dumpit remote protocol.")    
+                elif p[0] == "protocol" and p[1] == "dumpit":
+                    break        
 
             res = self._sio.call("forward_reconnect", self._reconnect_token, timeout=5)
             if res["error"]:
@@ -1162,9 +1165,12 @@ class MainApp(main.main):
             self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith(
                 "::1") or self.bTargetRemote.Value.startswith("[::1]") else f"https://{self.bTargetRemote.Value}/", transports=["websocket"], socketio_path="dumpit_remote")
 
-            p = self._sio.receive(5)
-            if p[0] != "protocol" or p[1] != "dumpit":
-                raise Exception("Not a valid Dumpit remote protocol.")
+            while True:
+                p = self._sio.receive(5)
+                if p[0] == "protocol" and p[1] != "dumpit":
+                    raise Exception("Not a valid Dumpit remote protocol.") 
+                elif p[0] == "protocol" and p[1] == "dumpit":
+                    break
 
             rep = wx.TextEntryDialog(self, "Enter interface token")
             if rep.ShowModal() == wx.ID_CANCEL:
@@ -1236,9 +1242,12 @@ class MainApp(main.main):
             self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith(
                 "::1") or self.bTargetRemote.Value.startswith("[::1]") else f"https://{self.bTargetRemote.Value}/", transports=["websocket"], socketio_path="dumpit_remote")
 
-            p = self._sio.receive(5)
-            if p[0] != "protocol" or p[1] != "dumpit":
-                raise Exception("Not a valid Dumpit remote protocol.")            
+            while True:
+                p = self._sio.receive(5)
+                if p[0] == "protocol" and p[1] != "dumpit":
+                    raise Exception("Not a valid Dumpit remote protocol.")  
+                elif p[0] == "protocol" and p[1] == "dumpit":
+                    break
 
             token = self._sio.call("forward_request", timeout=5)
             forward_wait = ForwardApp(self, token["token"]).ShowModal()
