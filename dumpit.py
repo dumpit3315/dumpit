@@ -1140,6 +1140,8 @@ class MainApp(main.main):
 
             self._doAnalytics("error", error=str(
                 e), traceback=traceback.format_exc())
+            wx.MessageBox(str(e), "Dumpit", wx.OK |
+                          wx.CENTER | wx.ICON_ERROR, self)
 
         finally:
             self._reconnecting = False
