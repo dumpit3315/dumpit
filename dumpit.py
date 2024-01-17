@@ -864,6 +864,9 @@ class MainApp(main.main):
                     elif p[0] == "pong_remote":
                         self._pong_flag.set()
 
+                    elif p[0] == "protocol" and p[1] == "dumpit":
+                        self._sio.call("forward_reconnect", self._reconnect_token, timeout=5)
+
                 except socketio.exceptions.TimeoutError:
                     pass
 
@@ -891,6 +894,9 @@ class MainApp(main.main):
                         
                     elif p[0] == "pong_remote":
                         self._pong_flag.set()
+
+                    elif p[0] == "protocol" and p[1] == "dumpit":
+                        self._sio.call("forward_reconnect", self._reconnect_token, timeout=5)
 
                 except socketio.exceptions.TimeoutError:
                     pass
