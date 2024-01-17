@@ -64,7 +64,7 @@ def _msleep(dur: int):
 
 
 def doTrackThread(user_id, action, openocd_version, config, **kwargs):
-    try:        
+    try:
         res = requests.post("https://dumpit.ucomsite.my.id/analytics/track", json={
             "user_id": user_id,
             "action": action,
@@ -75,7 +75,7 @@ def doTrackThread(user_id, action, openocd_version, config, **kwargs):
             "config": config,
             **kwargs
         }, timeout=5)
-        
+
         assert res.status_code >= 200 and res.status_code <= 299, f"{res.status_code} {res.reason}"
         _PTRACKING.put(action)
 
@@ -83,6 +83,7 @@ def doTrackThread(user_id, action, openocd_version, config, **kwargs):
         if True:
             print("unable to track:")
             traceback.print_exc()
+
 
 '''
 class ForwardApp(forwardDialog.forwardDialog):
@@ -207,6 +208,7 @@ class ForwardApp(forwardDialog.forwardDialog):
         self._ws_parent._sio.disconnect()
 '''
 
+
 class ForwardApp(forwardDialog.forwardDialog):
     def __init__(self, parent, token):
         super().__init__(parent)
@@ -216,7 +218,7 @@ class ForwardApp(forwardDialog.forwardDialog):
         self.status.Value = ""
 
         self._wsThreadQueue = queue.Queue()
-        
+
         self._wsThread = threading.Thread(target=self._doWSLoop)
         self._wsThread.daemon = True
 
@@ -238,10 +240,11 @@ class ForwardApp(forwardDialog.forwardDialog):
         try:
             if not self._ws_parent._sio.connected:
                 self._ws_parent._doAnalytics("disconnect", reason=1)
-                self.Unbind(wx.EVT_IDLE)                
+                self.Unbind(wx.EVT_IDLE)
                 self._loop_running = False
 
-                if self._wsThread: self._wsThread.join(15)
+                if self._wsThread:
+                    self._wsThread.join(15)
                 return self.EndModal(0)
 
             q = self._wsThreadQueue.get_nowait()
@@ -252,24 +255,26 @@ class ForwardApp(forwardDialog.forwardDialog):
 
                 self._ws_parent._reconnect_token = q[1]["reconnect_token"]
 
-                if self._wsThread: self._wsThread.join(15)
+                if self._wsThread:
+                    self._wsThread.join(15)
                 return self.EndModal(1)
-            
+
             elif q[1] == "bye":
-                #print("bye event")
+                # print("bye event")
                 self._ws_parent._sio.disconnect()
 
         except queue.Empty:
-            pass        
-                
+            pass
+
         event.RequestMore()
 
-    def doStop(self, event):        
+    def doStop(self, event):
         try:
             self._ws_parent._sio.call("bye", "", timeout=30)
         except Exception:
             pass
         self._ws_parent._sio.disconnect()
+
 
 class FT232HConfig(ft232h_pinconfig.FT232H_Pin_Config):
     def __init__(self, parent):
@@ -521,6 +526,7 @@ class FT232RConfig(ft232r_pinconfig.FT232R_Pin_Config):
     def doCancel(self, event):
         self.EndModal(wx.ID_CANCEL)
 
+
 class ResetConfig(resetDelay.ResetDelayConfig):
     def __init__(self, parent):
         super().__init__(parent)
@@ -531,8 +537,8 @@ class ResetConfig(resetDelay.ResetDelayConfig):
         self.nNTRSTDelay.Value = self.base_parent.ntrst_reset_delay
         self.nSRSTDelay.Value = self.base_parent.nsrst_reset_delay
         self.nResetDelay.Value = self.base_parent.reset_delay
-        
-    def bDoApply( self, event ):
+
+    def bDoApply(self, event):
         self.base_parent.ntrst_reset_pulse = self.nNTRSTWidth.Value
         self.base_parent.nsrst_reset_pulse = self.nSRSTWidth.Value
         self.base_parent.ntrst_reset_delay = self.nNTRSTDelay.Value
@@ -540,20 +546,21 @@ class ResetConfig(resetDelay.ResetDelayConfig):
         self.base_parent.reset_delay = self.nResetDelay.Value
         self.EndModal(0)
 
-    def bDoCancel( self, event ):
+    def bDoCancel(self, event):
         self.EndModal(0)
+
 
 class MainApp(main.main):
     def __init__(self, parent):
         global _PTRACKCOUNT
 
         super().__init__(parent)
-        
+
         print("Dumpit started")
         self.status.Value = ""
         self.finderStatus.Value = ""
         self.sInfo.Value = ""
-        
+
         for i, n in const._interfaces:
             self.cInterface.Append(i)
 
@@ -631,7 +638,7 @@ class MainApp(main.main):
         self._next_ping = 0
         self._next_timeout = 0
         self._reconnect_token = None
-        
+
         self._reconnecting = False
 
         self._dumpThread = None
@@ -676,13 +683,13 @@ class MainApp(main.main):
         self._loaded_dcc = None
 
         self._cfi_start_offset = None
-        
+
         self.ntrst_reset_delay = 50
         self.ntrst_reset_pulse = 100
-        
+
         self.nsrst_reset_delay = 50
         self.nsrst_reset_pulse = 100
-        
+
         self.reset_delay = 100
 
         if os.path.exists(os.path.join(os.path.dirname(__file__), "dumpit_config.json")):
@@ -694,7 +701,7 @@ class MainApp(main.main):
             self.cTarget.Selection = cfg["target"]
             self.cTap.Selection = cfg["tap"]
             self.nIR.Value = cfg["ir"]
-            self.cResetMode.Selection = cfg["reset_mode"]            
+            self.cResetMode.Selection = cfg["reset_mode"]
             self.ntrst_reset_pulse = cfg["trst_reset_pulse"]
             self.nsrst_reset_pulse = cfg["srst_reset_pulse"]
             self.ntrst_reset_delay = cfg["trst_reset_delay"]
@@ -837,7 +844,8 @@ class MainApp(main.main):
             try:
                 if not self._logSupressed:
                     self._logThreadQueue.put(l.decode("utf-8"))
-                    if self._isForward: self._sio.emit("log", l.decode("utf-8"))
+                    if self._isForward:
+                        self._sio.emit("log", l.decode("utf-8"))
 
             except Exception:
                 pass
@@ -853,28 +861,29 @@ class MainApp(main.main):
 
                     elif p[0] == "log" and not self._logSupressed:
                         self._logThreadQueue.put(p[1])
-                        
+
                     elif p[0] == "bye":
-                        #print("bye event")
+                        # print("bye event")
                         self._sio.disconnect()
-                    
+
                     elif p[0] == "ping_remote":
                         self._sio.emit("pong_remote")
-                        
+
                     elif p[0] == "pong_remote":
                         self._pong_flag.set()
 
                     elif p[0] == "protocol" and p[1] == "dumpit":
-                        res = self._sio.call("forward_reconnect", self._reconnect_token, timeout=5)
-                        if not res["error"]:                            
-                            self._reconnect_token = res["reconnect_token"]                        
+                        res = self._sio.call(
+                            "forward_reconnect", self._reconnect_token, timeout=5)
+                        if not res["error"]:
+                            self._reconnect_token = res["reconnect_token"]
 
                 except socketio.exceptions.TimeoutError:
                     pass
 
                 except Exception:
                     pass
-            
+
     def _doWSLoop_Forward(self):
         while (self._ocd.poll() is None and self._sio.connected) or self._reconnecting:
             if not self._reconnecting:
@@ -883,23 +892,24 @@ class MainApp(main.main):
 
                     if p[0] == "data":
                         self._sio.emit("data", self._ocdSendCommand(p[1]))
-                        
+
                     elif p[0] == "command":
                         pass
-                    
+
                     elif p[0] == "bye":
-                        #print("bye event")
+                        # print("bye event")
                         self._sio.disconnect()
-                        
+
                     elif p[0] == "ping_remote":
                         self._sio.emit("pong_remote")
-                        
+
                     elif p[0] == "pong_remote":
                         self._pong_flag.set()
 
                     elif p[0] == "protocol" and p[1] == "dumpit":
-                        res = self._sio.call("forward_reconnect", self._reconnect_token, timeout=5)
-                        if not res["error"]:                            
+                        res = self._sio.call(
+                            "forward_reconnect", self._reconnect_token, timeout=5)
+                        if not res["error"]:
                             self._reconnect_token = res["reconnect_token"]
 
                 except socketio.exceptions.TimeoutError:
@@ -911,7 +921,8 @@ class MainApp(main.main):
     def doLoop(self, event):
         global _PTRACKCOUNT
 
-        if self._isConnect or self._isConnectRemote: event.RequestMore()
+        if self._isConnect or self._isConnectRemote:
+            event.RequestMore()
 
         try:
             track = _PTRACKING.get_nowait()
@@ -971,7 +982,7 @@ class MainApp(main.main):
                 self._sio.call("bye", "", timeout=30)
             except Exception:
                 pass
-            self._sio.disconnect()                                
+            self._sio.disconnect()
             self._isConnect = False
             self._isForward = False
 
@@ -980,7 +991,7 @@ class MainApp(main.main):
             self.bConnect.Label = "Connect"
             self.bConnectRemote.Enable(True)
             self.bForwardRemote.Enable(True)
-            self._doAnalytics("disconnect", reason=1)            
+            self._doAnalytics("disconnect", reason=1)
 
         if self._sio and self._isConnectRemote and not self._sio.connected:
             self._isConnectRemote = False
@@ -988,21 +999,21 @@ class MainApp(main.main):
             self.bConnectRemote.Enable(True)
             self.bForwardRemote.Enable(True)
             self._doAnalytics("disconnect", reason=2)
-            
+
             if self._isForward and self._ocd and self._isConnect and self._ocd.poll() is None:
                 self._ocd.terminate()
                 self._isConnect = False
                 self._isForward = False
-                
-            #self.bReconnectRemote.Hide()
-            #self.bForwardRemote.Show()
-            
-            self.Layout()                    
 
-    def _ocdSendCommand(self, cmd: str, _return: bool=True):
+            # self.bReconnectRemote.Hide()
+            # self.bForwardRemote.Show()
+
+            self.Layout()
+
+    def _ocdSendCommand(self, cmd: str, _return: bool = True):
         if self._debug_logs:
             print(f"EXEC {cmd}")
-            
+
         if self._ocd and self._ocd.poll() is None:
             self._ocd.stdin.write(cmd.encode("latin-1") + b"\x1a")
             self._ocd.stdin.flush()
@@ -1015,18 +1026,18 @@ class MainApp(main.main):
 
                 resTemp += t
 
-            if _return: 
+            if _return:
                 return resTemp.decode("latin-1")
-            
+
             else:
                 print(f"SINK: {resTemp}")
                 return ""
 
         elif self._sio and self._sio.connected:
             self._sio.emit("data", cmd)
-            if _return: 
+            if _return:
                 return self._sioMsgQueue.get(timeout=10)
-            
+
             else:
                 print(f"SINK: {self._sioMsgQueue.get(timeout=10)}")
                 return ""
@@ -1041,38 +1052,38 @@ class MainApp(main.main):
             self.bConnect.Label = "Connect"
             self.bConnectRemote.Enable(True)
             self.bForwardRemote.Enable(True)
-            
+
             if self._isForward and self._isConnectRemote:
                 self._isForward = False
                 self._isConnectRemote = False
-                
+
                 if self._sio and self._sio.connected:
                     try:
                         self._sio.call("bye", "", timeout=30)
                     except Exception:
                         pass
                     self._sio.disconnect()
-                    
-                    #self.bReconnectRemote.Hide()
-                    #self.bForwardRemote.Show()
-                    
+
+                    # self.bReconnectRemote.Hide()
+                    # self.bForwardRemote.Show()
+
                     self.Layout()
-            
-            self._doAnalytics("disconnect", reason=0)        
+
+            self._doAnalytics("disconnect", reason=0)
 
         elif self._isConnectRemote:
             self._isConnectRemote = False
-            
+
             if self._sio and self._sio.connected:
                 try:
                     self._sio.call("bye", "", timeout=30)
                 except Exception:
                     pass
                 self._sio.disconnect()
-                
-                #self.bReconnectRemote.Hide()
-                #self.bForwardRemote.Show()
-                
+
+                # self.bReconnectRemote.Hide()
+                # self.bForwardRemote.Show()
+
                 self.Layout()
 
             self.bConnect.Label = "Connect"
@@ -1094,7 +1105,7 @@ class MainApp(main.main):
             self._isConnect = True
             self._isConnectRemote = False
             self._isForward = False
-            
+
             self.status.Value = f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n'
             self._ocd = subprocess.Popen([getOCDExec(
             ), "-c", INIT_CMD], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -1119,33 +1130,35 @@ class MainApp(main.main):
             self._doAnalytics("idcode", idcode=self.cmd_get_idcode())
 
     def doReconnectRemote(self, event):
-        if not self._isConnectRemote: return
-        
+        if not self._isConnectRemote:
+            return
+
         self._reconnecting = True
         try:
             self._sio.disconnect()
-            time.sleep(2)            
-            
+            time.sleep(2)
+
             self._sio = socketio.SimpleClient(handle_sigint=False)
             gc.collect()
-            
+
             self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith(
-                    "::1") or self.bTargetRemote.Value.startswith("[::1]") else f"https://{self.bTargetRemote.Value}/", transports=["websocket"], socketio_path="dumpit_remote")
-            
+                "::1") or self.bTargetRemote.Value.startswith("[::1]") else f"https://{self.bTargetRemote.Value}/", transports=["websocket"], socketio_path="dumpit_remote")
+
             while True:
                 p = self._sio.receive(5)
                 if p[0] == "protocol" and p[1] != "dumpit":
-                    raise Exception("Not a valid Dumpit remote protocol.")    
+                    raise Exception("Not a valid Dumpit remote protocol.")
                 elif p[0] == "protocol" and p[1] == "dumpit":
-                    break        
+                    break
 
-            res = self._sio.call("forward_reconnect", self._reconnect_token, timeout=5)
+            res = self._sio.call("forward_reconnect",
+                                 self._reconnect_token, timeout=5)
             if res["error"]:
                 raise Exception(res["error"])
-            
+
             self._reconnect_token = res["reconnect_token"]
             self._logThreadQueue.put("Reconnected to the remote.")
-            
+
         except Exception as e:
             if self._sio and self._sio.connected:
                 try:
@@ -1168,9 +1181,10 @@ class MainApp(main.main):
                 if self._sio:
                     self._sio.disconnect()
 
-                if self._sioThread: self._sioThread.join(15)
+                if self._sioThread:
+                    self._sioThread.join(15)
             except Exception:
-                pass            
+                pass
 
             self._sio = socketio.SimpleClient(handle_sigint=False)
             gc.collect()
@@ -1183,7 +1197,7 @@ class MainApp(main.main):
             while True:
                 p = self._sio.receive(5)
                 if p[0] == "protocol" and p[1] != "dumpit":
-                    raise Exception("Not a valid Dumpit remote protocol.") 
+                    raise Exception("Not a valid Dumpit remote protocol.")
                 elif p[0] == "protocol" and p[1] == "dumpit":
                     break
 
@@ -1200,14 +1214,14 @@ class MainApp(main.main):
             res = self._sio.call("forward_connect", rep.GetValue(), timeout=5)
             if res["error"]:
                 raise Exception(res["error"])
-            
+
             self._reconnect_token = res["reconnect_token"]
-            
-            #self.bReconnectRemote.Show()
-            #self.bForwardRemote.Hide()            
-            
-            self.Layout()            
-                        
+
+            # self.bReconnectRemote.Show()
+            # self.bForwardRemote.Hide()
+
+            self.Layout()
+
             self.status.Value = ""
             self._logThreadQueue = queue.Queue()
             self._sioMsgQueue = queue.Queue()
@@ -1224,12 +1238,12 @@ class MainApp(main.main):
 
             self._sioThread.start()
 
-            self._isConnectRemote = True         
-            self._isForward = False   
+            self._isConnectRemote = True
+            self._isForward = False
 
             self.bConnect.Label = "Disconnect"
             self.bConnectRemote.Enable(False)
-            self.bForwardRemote.Enable(False)            
+            self.bForwardRemote.Enable(False)
 
         except Exception as e:
             if self._sio and self._sio.connected:
@@ -1250,10 +1264,11 @@ class MainApp(main.main):
                 if self._sio:
                     self._sio.disconnect()
 
-                if self._sioThread: self._sioThread.join(15)
+                if self._sioThread:
+                    self._sioThread.join(15)
             except Exception:
-                pass            
-            
+                pass
+
             self._sio = socketio.SimpleClient(handle_sigint=False)
             gc.collect()
 
@@ -1263,21 +1278,21 @@ class MainApp(main.main):
             while True:
                 p = self._sio.receive(5)
                 if p[0] == "protocol" and p[1] != "dumpit":
-                    raise Exception("Not a valid Dumpit remote protocol.")  
+                    raise Exception("Not a valid Dumpit remote protocol.")
                 elif p[0] == "protocol" and p[1] == "dumpit":
                     break
 
             token = self._sio.call("forward_request", timeout=5)
             forward_wait = ForwardApp(self, token["token"]).ShowModal()
             if forward_wait:
-                #self.bReconnectRemote.Show()
-                #self.bForwardRemote.Hide()
-                
+                # self.bReconnectRemote.Show()
+                # self.bForwardRemote.Hide()
+
                 self.Layout()
-                
+
                 if self._ocd and self._ocd.poll() is None:
                     self._ocd.kill()
-                    
+
                 gc.collect()
 
                 INIT_CMD = getInitCmd(self)
@@ -1289,10 +1304,11 @@ class MainApp(main.main):
                 self._isConnect = True
                 self._isForward = True
                 self._isConnectRemote = True
-                
+
                 self.status.Value = f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n'
-                self._sio.emit("log", f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n')
-                
+                self._sio.emit(
+                    "log", f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n')
+
                 self._ocd = subprocess.Popen([getOCDExec(
                 ), "-c", INIT_CMD], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -1311,8 +1327,9 @@ class MainApp(main.main):
                 self._logThread = threading.Thread(target=self._doLogging)
                 self._logThread.daemon = True
 
-                self._sioThread = threading.Thread(target=self._doWSLoop_Forward)
-                
+                self._sioThread = threading.Thread(
+                    target=self._doWSLoop_Forward)
+
                 self._logThread.start()
                 self._sioThread.start()
 
@@ -1450,7 +1467,8 @@ class MainApp(main.main):
                           addr_end=eOffset, is_memory=True)
 
         self._logSupressed = True
-        self._logThreadQueue.put(f"Dump memory started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
+        self._logThreadQueue.put(
+            f"Dump memory started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
 
         try:
             with open(name, "wb") as tempFile:
@@ -1461,7 +1479,8 @@ class MainApp(main.main):
 
                     self._progMsgQueue.put(cOffset/eOffset)
 
-            self._logThreadQueue.put(f"Dump memory finished {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
+            self._logThreadQueue.put(
+                f"Dump memory finished {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
 
         except Exception as e:
             traceback.print_exc()
@@ -1518,7 +1537,7 @@ class MainApp(main.main):
 
         try:
             if self._loaded_dcc is not None:
-                self._ocdSendCommand("soft_reset_halt")                
+                self._ocdSendCommand("soft_reset_halt")
                 self._ocdSendCommand(f"load_image $_DCC_PATH", False)
                 self._ocdSendCommand("arm core_state arm")
                 self._ocdSendCommand(
@@ -1606,14 +1625,15 @@ class MainApp(main.main):
                     (5 if O1N_isDDP else 6) + ((O1N_DevID >> 4) & 0xf))
 
             time.sleep(1)
-            self._logSupressed = True            
-            self._logThreadQueue.put(f"Dump flash started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
+            self._logSupressed = True
+            self._logThreadQueue.put(
+                f"Dump flash started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
 
             with open(name, "wb") as tempFile:
                 while cOffset < eOffset and not self._isReadCanceled:
                     if self._loaded_dcc is not None or const._platforms[self.cChipset.Selection]["mode"] in [-1, 4]:
                         tempFile.write(self.cmd_read_flash(
-                             cOffset - self._cfi_start_offset, 0x200))
+                            cOffset - self._cfi_start_offset, 0x200))
                         cOffset += 0x200
 
                     elif const._platforms[self.cChipset.Selection]["mode"] == 1:
@@ -1945,7 +1965,8 @@ class MainApp(main.main):
                     self._progMsgQueue.put(cOffset/eOffset)
 
                 tempFile.write(spareBuf + bbBuf)
-                self._logThreadQueue.put(f"Dump flash finished {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
+                self._logThreadQueue.put(
+                    f"Dump flash finished {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
                 # tempFile.write() # TODO: Write Dumpit Device Footer format
 
         except Exception as e:
@@ -2035,11 +2056,11 @@ class MainApp(main.main):
     def doLoader(self, event):
         with wx.FileDialog(self, "Load DCC", wildcard="DCC Hex file|*.hex", style=wx.FD_OPEN) as fd:
             fd: wx.FileDialog
-            if fd.ShowModal() != wx.ID_CANCEL:                
+            if fd.ShowModal() != wx.ID_CANCEL:
                 self._loaded_dcc = fd.GetPath()
-            else:                
+            else:
                 self._loaded_dcc = None
-                
+
             self.lCurrentDCC.SetLabel(f"DCC Loader: {self._loaded_dcc}")
 
     def doScript(self, event):
@@ -2313,12 +2334,12 @@ class MainApp(main.main):
 
             cfg["tracking_count"] = _PTRACKCOUNT
             cfg["debug_log"] = self._debug_logs
-            
+
             cfg["dcc_used"] = self._loaded_dcc is not None
 
             json.dump(cfg, open(os.path.join(os.path.dirname(
                 __file__), "dumpit_config.json"), "w"), indent=4)
-            
+
             wx.Exit()
 
     def doOCDCmdExec(self, event):
@@ -2341,7 +2362,7 @@ class MainApp(main.main):
             temp_analytics += f"{k}: {_PTRACKCOUNT[k]}\n"
 
         self.analytics_stat.Value = temp_analytics
-        
+
     def bDoConfigureReset(self, event):
         ResetConfig(self).ShowModal()
 
@@ -2389,7 +2410,9 @@ def getInitCmd(self: MainApp):
 
         if self._loaded_dcc is not None:
             path_escaped = self._loaded_dcc.replace('\\', '/')
-            INIT_CMD += "flash bank target.dcc ocl 0 0 0 0 target.cpu; set _DCC_PATH {" + path_escaped + "}; " + f"set _DCC_START_OFFSET {hex(intelhex.IntelHex(self._loaded_dcc).minaddr())}; "
+            INIT_CMD += "flash bank target.dcc ocl 0 0 0 0 target.cpu; set _DCC_PATH {" + path_escaped + \
+                "}; " + \
+                f"set _DCC_START_OFFSET {hex(intelhex.IntelHex(self._loaded_dcc).minaddr())}; "
 
         elif const._platforms[self.cChipset.Selection]["mode"] == -1:
             INIT_CMD += "flash bank target.dcc dummy_flash 0 0 0 0 target.cpu; "
