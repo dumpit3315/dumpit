@@ -1113,7 +1113,7 @@ class MainApp(main.main):
         try:
             self._sio.disconnect()
             
-            self._sio = socketio.SimpleClient()
+            self._sio = socketio.SimpleClient(handle_sigint=False)
             gc.collect()
             
             self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith(
@@ -1151,7 +1151,7 @@ class MainApp(main.main):
 
             if self._sioThread: self._sioThread.join()
 
-            self._sio = socketio.SimpleClient()
+            self._sio = socketio.SimpleClient(handle_sigint=False)
             gc.collect()
 
             self._doAnalytics("connect", type=2)
@@ -1227,7 +1227,7 @@ class MainApp(main.main):
 
             if self._sioThread: self._sioThread.join()
             
-            self._sio = socketio.SimpleClient()
+            self._sio = socketio.SimpleClient(handle_sigint=False)
             gc.collect()
 
             self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith(
