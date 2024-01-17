@@ -844,57 +844,59 @@ class MainApp(main.main):
 
     def _doWSLoop(self):
         while self._sio.connected or self._reconnecting:
-            try:
-                p = self._sio.receive(1)
+            if not self._reconnecting:
+                try:
+                    p = self._sio.receive(1)
 
-                if p[0] == "data":
-                    self._sioMsgQueue.put(p[1])
+                    if p[0] == "data":
+                        self._sioMsgQueue.put(p[1])
 
-                elif p[0] == "log" and not self._logSupressed:
-                    self._logThreadQueue.put(p[1])
+                    elif p[0] == "log" and not self._logSupressed:
+                        self._logThreadQueue.put(p[1])
+                        
+                    elif p[0] == "bye":
+                        #print("bye event")
+                        self._sio.disconnect()
                     
-                elif p[0] == "bye":
-                    #print("bye event")
-                    self._sio.disconnect()
-                
-                elif p[0] == "ping_remote":
-                    self._sio.emit("pong_remote")
-                    
-                elif p[0] == "pong_remote":
-                    self._pong_flag.set()
+                    elif p[0] == "ping_remote":
+                        self._sio.emit("pong_remote")
+                        
+                    elif p[0] == "pong_remote":
+                        self._pong_flag.set()
 
-            except socketio.exceptions.TimeoutError:
-                pass
+                except socketio.exceptions.TimeoutError:
+                    pass
 
-            except Exception:
-                pass
+                except Exception:
+                    pass
             
     def _doWSLoop_Forward(self):
         while (self._ocd.poll() is None and self._sio.connected) or self._reconnecting:
-            try:
-                p = self._sio.receive(1)
+            if not self._reconnecting:
+                try:
+                    p = self._sio.receive(1)
 
-                if p[0] == "data":
-                    self._sio.emit("data", self._ocdSendCommand(p[1]))
+                    if p[0] == "data":
+                        self._sio.emit("data", self._ocdSendCommand(p[1]))
+                        
+                    elif p[0] == "command":
+                        pass
                     
-                elif p[0] == "command":
+                    elif p[0] == "bye":
+                        #print("bye event")
+                        self._sio.disconnect()
+                        
+                    elif p[0] == "ping_remote":
+                        self._sio.emit("pong_remote")
+                        
+                    elif p[0] == "pong_remote":
+                        self._pong_flag.set()
+
+                except socketio.exceptions.TimeoutError:
                     pass
-                
-                elif p[0] == "bye":
-                    #print("bye event")
-                    self._sio.disconnect()
-                    
-                elif p[0] == "ping_remote":
-                    self._sio.emit("pong_remote")
-                    
-                elif p[0] == "pong_remote":
-                    self._pong_flag.set()
 
-            except socketio.exceptions.TimeoutError:
-                pass
-
-            except Exception:
-                pass
+                except Exception:
+                    pass
 
     def doLoop(self, event):
         global _PTRACKCOUNT
