@@ -1130,6 +1130,17 @@ class MainApp(main.main):
             self._reconnect_token = res["reconnect_token"]
             self._logThreadQueue.put("Reconnected to the remote.")
             
+        except Exception as e:
+            if self._sio and self._sio.connected:
+                try:
+                    self._sio.call("bye", "", timeout=30)
+                except Exception:
+                    pass
+                self._sio.disconnect()
+
+            self._doAnalytics("error", error=str(
+                e), traceback=traceback.format_exc())
+
         finally:
             self._reconnecting = False
 
