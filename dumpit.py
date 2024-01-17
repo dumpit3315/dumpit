@@ -241,7 +241,7 @@ class ForwardApp(forwardDialog.forwardDialog):
                 self.Unbind(wx.EVT_IDLE)                
                 self._loop_running = False
 
-                self._wsThread.join()
+                if self._wsThread: self._wsThread.join(15)
                 return self.EndModal(0)
 
             q = self._wsThreadQueue.get_nowait()
@@ -252,7 +252,7 @@ class ForwardApp(forwardDialog.forwardDialog):
 
                 self._ws_parent._reconnect_token = q[1]["reconnect_token"]
 
-                self._wsThread.join()
+                if self._wsThread: self._wsThread.join(15)
                 return self.EndModal(1)
             
             elif q[1] == "bye":
@@ -1164,10 +1164,13 @@ class MainApp(main.main):
 
     def doConnectRemote(self, event):
         try:
-            if self._sio:
-                self._sio.disconnect()
+            try:
+                if self._sio:
+                    self._sio.disconnect()
 
-            if self._sioThread: self._sioThread.join()
+                if self._sioThread: self._sioThread.join(15)
+            except Exception:
+                pass            
 
             self._sio = socketio.SimpleClient(handle_sigint=False)
             gc.collect()
@@ -1243,10 +1246,13 @@ class MainApp(main.main):
 
     def doForwardRemote(self, event):
         try:
-            if self._sio:
-                self._sio.disconnect()
+            try:
+                if self._sio:
+                    self._sio.disconnect()
 
-            if self._sioThread: self._sioThread.join()
+                if self._sioThread: self._sioThread.join(15)
+            except Exception:
+                pass            
             
             self._sio = socketio.SimpleClient(handle_sigint=False)
             gc.collect()
