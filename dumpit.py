@@ -574,7 +574,7 @@ class MainApp(main.main):
         for r, v in const._reset_type:
             self.cResetMode.Append(r)
 
-        self.cResetMode.Selection = 2
+        self.cResetMode.Selection = 3
 
         '''
         self._resetDelays = []

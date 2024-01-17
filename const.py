@@ -9,7 +9,7 @@ _force_ir = {4: ["arm7tdmi", "arm9tdmi", "arm920t", "arm720t",
 _dap_required = ["cortex_m", "cortex_a", "cortex_r4", "aarch64"]
 _init_normal = "jtag newtap target cpu -irlen (IR)(XPARAM); target create target.cpu (TYPE) -endian (ENDIAN) -chain-position target.cpu; "
 _init_dap = "jtag newtap target cpu -irlen (IR)(XPARAM); dap create target.dap -chain-position target.cpu; target create target.cpu (TYPE) -endian (ENDIAN) -dap target.dap; "
-_reset_type = [("None", "none"), ("TRST only", "trst_only"), ("SRST only", "srst_only"), ("TRST and SRST: SRST pulls TRST", "trst_and_srst srst_pulls_trst"),
+_reset_type = [("None", "none"), ("TRST only", "trst_only"), ("SRST only", "srst_only"), ("TRST and SRST", "trst_and_srst"), ("TRST and SRST: SRST pulls TRST", "trst_and_srst srst_pulls_trst"),
                ("TRST and SRST: TRST pulls SRST", "trst_and_srst trst_pulls_srst"), ("TRST and SRST: Combined", "trst_and_srst combined"), ("TRST and SRST: Seperate", "trst_and_srst seperate")]
 _reset_delays = [0, 5, 10, 25, 50, 75, 100]
 _ft232h_adapters = [("Custom", ""), ("Bus Blaster", "source [find interface/ftdi/dp_busblaster.cfg];"), ("Bus Blaster (KT-Link)", "source [find interface/ftdi/dp_busblaster_kt-link.cfg];"), ("JTAGKey", "source [find interface/ftdi/jtagkey.cfg];"), ("JTAGKey2", "source [find interface/ftdi/jtagkey2.cfg];"), ("JTAGKey2P",
