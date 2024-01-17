@@ -1111,8 +1111,8 @@ class MainApp(main.main):
         
         self._reconnecting = True
         try:
-            self._sio.disconnect()
-            time.sleep(2)
+            self._sio.client.eio.disconnect()
+            time.sleep(2)            
             
             self._sio = socketio.SimpleClient(handle_sigint=False)
             gc.collect()
