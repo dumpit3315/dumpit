@@ -920,6 +920,12 @@ class MainApp(main.main):
                             for l, id in self._logPushBuff:
                                 self._sio.emit(
                                     "log_req", {"data": l.decode("utf-8"), "id": id})
+                        else:
+                            try:
+                                self._sio.call("bye", "", timeout=30)
+                            except Exception:
+                                pass
+                            self._sio.disconnect()
 
                     elif p[0] == "log_ack":
                         for e, (_, id) in enumerate(self._logPushBuff):
