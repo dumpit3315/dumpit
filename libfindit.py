@@ -47,6 +47,10 @@ class _FakeChipset(gpio.GpioAsyncController):
         self.trace_reseting = False
         self.tck_on = False
 
+        self.tdo_temp = 0
+        self._SR_TEMP = 0
+        self._SR_LEN = 0
+
     def configure(self, addr, dir, **kwargs):
         self.jtag_dir = dir
         kwargs = dict(kwargs)
@@ -57,42 +61,37 @@ class _FakeChipset(gpio.GpioAsyncController):
     def read(self):
         return self.jtag_pins
 
+    # Spec from https://ynzinfo.tripod.com/JTAG/ids_jtag.htm
+    # Based on https://medium.com/@aliaksandr.kavalchuk/diving-into-jtag-protocol-part-1-overview-fbdc428d3a16
     def write(self, out: int):
         self.jtag_pins = out
 
         if self.jtag_pins & (1 << self.TCK) and not self.tck_on:  # Active pin is TCK
             self.tck_on = True
             self.jtag_pins |= (1 << self.RTCK)  # Mirror RTCK
+
+            # Per JTAG Spec, TDI and TMS were sampled on the rising edge, and allows shift register operations to be done.
             if not self.trace_reseting:  # TRST is HIGH, do something
                 if self.jtag_state == 5:  # If the state is Shift-DR, output regardless of TMS
-                    if self.instruction == 0:  # IDCODE
-                        if self.dr_shift < 32:
-                            if self.IDCODE & (1 << self.dr_shift):
-                                self.jtag_pins |= (1 << self.TDO)
+                    self.tdo_temp = self._SR_TEMP & 1
+                    self._SR_TEMP >>= 1
 
-                            else:
-                                self.jtag_pins &= ~(1 << self.TDO)
+                    if self.instruction == 0:
+                        self._SR_TEMP |= (1 << (self._SR_LEN - 1))
 
-                            self.dr_shift += 1
-
-                    elif self.instruction == 1:  # BYPASS
+                    elif self.instruction == 1:  # Bypass, directly connect TDI to TDO
                         if self.jtag_pins & (1 << self.TDI):
-                            self.jtag_pins |= (1 << self.TDO)
+                            self.tdo_temp = 1
 
                         else:
-                            self.jtag_pins &= ~(1 << self.TDO)
+                            self.tdo_temp = 0
 
                 elif self.jtag_state == 11:  # If the state is Shift-IR, output regardless of TMS
+                    self.tdo_temp = self._SR_TEMP & 1
+                    self._SR_TEMP >>= 1
+
                     if self.jtag_pins & (1 << self.TDI):
-                        self.ir_code |= (1 << self.ir_shift)
-
-                    else:
-                        self.ir_code &= ~(1 << self.ir_shift)
-
-                    self.ir_shift += 1
-
-                    if self.ir_shift >= self.IR_LENGTH:
-                        self.ir_shift = 0
+                        self._SR_TEMP |= (1 << (self._SR_LEN - 1))
 
                 if self.jtag_pins & (1 << self.TMS):
                     if self.jtag_state == 0:  # Idle -> Select DR
@@ -126,12 +125,6 @@ class _FakeChipset(gpio.GpioAsyncController):
                         self.jtag_state = 12
 
                     elif self.jtag_state in [12, 14]:  # Exit IR -> Update IR
-                        if self.ir_code == (2**self.IR_LENGTH)-1:
-                            self.instruction = 1
-
-                        elif self.ir_code == (2**self.IR_LENGTH)-2:
-                            self.instruction = 0
-
                         self.jtag_state = 15
 
                     elif self.jtag_state == 13:  # Pause IR -> Exit2 DR
@@ -148,9 +141,26 @@ class _FakeChipset(gpio.GpioAsyncController):
 
                     elif self.jtag_state == 1:  # Select DR -> Capture DR
                         self.jtag_state = 4
+                        if self.instruction == 0:  # IDCODE
+                            if self.dr_shift < 32:
+                                self._SR_TEMP = self.IDCODE
+                                self._SR_LEN = 32
+
+                        elif self.instruction == 1:  # BYPASS
+                            self._SR_TEMP = 0
+                            self._SR_LEN = 1
 
                     elif self.jtag_state == 4:  # Capture DR -> Shift DR
                         self.jtag_state = 5
+
+                        self.tdo_temp = self._SR_TEMP & 1
+                        self._SR_TEMP >>= 1
+
+                        if self.instruction == 0:
+                            self._SR_TEMP |= (1 << (self._SR_LEN - 1))
+
+                        elif self.instruction == 1:
+                            self.tdo_temp = 0
 
                     elif self.jtag_state == 6:  # Exit1 DR -> Pause DR
                         self.jtag_state = 7
@@ -158,21 +168,47 @@ class _FakeChipset(gpio.GpioAsyncController):
                     elif self.jtag_state == 8:  # Exit2 DR -> Shift DR
                         self.jtag_state = 5
 
+                        self.tdo_temp = self._SR_TEMP & 1
+                        self._SR_TEMP >>= 1
+
+                        if self.instruction == 0:
+                            self._SR_TEMP |= (1 << (self._SR_LEN - 1))
+
+                        elif self.instruction == 1:  # Bypass, directly connect TDI to TDO
+                            if self.jtag_pins & (1 << self.TDI):
+                                self.tdo_temp = 1
+
+                            else:
+                                self.tdo_temp = 0
+
                     elif self.jtag_state == 9:  # Update DR -> Idle
                         self.jtag_state = 0
                         self.dr_shift = 0
 
                     elif self.jtag_state == 2:  # Select IR -> Capture IR
                         self.jtag_state = 10
+                        self._SR_TEMP = 0b01
+                        self._SR_LEN = self.IR_LENGTH
 
                     elif self.jtag_state == 10:  # Capture IR -> Shift IR
                         self.jtag_state = 11
+
+                        self.tdo_temp = self._SR_TEMP & 1
+                        self._SR_TEMP >>= 1
+
+                        if self.jtag_pins & (1 << self.TDI):
+                            self._SR_TEMP |= (1 << (self._SR_LEN - 1))
 
                     elif self.jtag_state == 12:  # Exit1 IR -> Pause IR
                         self.jtag_state = 13
 
                     elif self.jtag_state == 14:  # Exit2 IR -> Shift IR
                         self.jtag_state = 11
+                        self.tdo_temp = self._SR_TEMP & 1
+                        self._SR_TEMP >>= 1
+
+                        if self.jtag_pins & (1 << self.TDI):
+                            self._SR_TEMP |= (1 << (self._SR_LEN - 1))
 
                     elif self.jtag_state == 15:  # Update IR -> Idle
                         self.jtag_state = 0
@@ -182,6 +218,24 @@ class _FakeChipset(gpio.GpioAsyncController):
         elif not self.jtag_pins & (1 << self.TCK) and self.tck_on:  # TCK isn't active
             self.tck_on = False
             self.jtag_pins &= ~(1 << self.RTCK)  # Mirror RTCK
+
+            if self.jtag_state == 15:  # IR applies on falling edge
+                if self._SR_TEMP == (2**self.IR_LENGTH)-1:
+                    self.instruction = 1
+
+                elif self._SR_TEMP == (2**self.IR_LENGTH)-2:
+                    self.instruction = 0
+
+                else:
+                    raise ValueError(
+                        f"Unknown JTAG register: {bin(self._SR_TEMP)}")
+
+            # Per JTAG spec, TDO was outputed falling edge
+            if self.tdo_temp:
+                self.jtag_pins |= (1 << self.TDO)
+
+            else:
+                self.jtag_pins &= ~(1 << self.TDO)
 
         if not self.jtag_pins & (1 << self.TRST) and not self.trace_reseting:  # TRST is low
             self.trace_reseting = True
@@ -213,14 +267,14 @@ def _msleep(dur: int):
 
 
 def _pulse_tck(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseController], tck: int):
-    _msleep(DELAY)
     dev.write(dev.read() & ~(1 << tck))
+    _msleep(DELAY)
     dev.write(dev.read() | (1 << tck))
 
 
 def _pulse_tdi(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseController], tck: int, tdi: int, value: int):
-    _msleep(DELAY)
     dev.write(dev.read() & ~(1 << tck))
+    _msleep(DELAY)
 
     if value:
         dev.write(dev.read() | (1 << tdi))
@@ -231,9 +285,21 @@ def _pulse_tdi(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseControl
     dev.write(dev.read() | (1 << tck))
 
 
-def _pulse_tdo(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseController], tck: int, tdo: int):
+def _pulse_tdi_rising(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseController], tck: int, tdi: int, value: int):
+    if value:
+        dev.write(dev.read() | (1 << tdi))
+
+    else:
+        dev.write(dev.read() & ~(1 << tdi))
+
+    dev.write(dev.read() | (1 << tck))
     _msleep(DELAY)
     dev.write(dev.read() & ~(1 << tck))
+
+
+def _pulse_tdo(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseController], tck: int, tdo: int):
+    dev.write(dev.read() & ~(1 << tck))
+    _msleep(DELAY)
     temp = (dev.read() >> tdo) & 1
     dev.write(dev.read() | (1 << tck))
     return temp
@@ -242,8 +308,8 @@ def _pulse_tdo(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseControl
 def _write_tap(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseController], tck: int, tms: int, tap: str):
     for bit in list(tap):
         assert bit in ["1", "0"]
-        _msleep(DELAY)
         dev.write(dev.read() & ~(1 << tck))
+        _msleep(DELAY)
 
         if bit == "1":
             dev.write(dev.read() | (1 << tms))
@@ -256,9 +322,13 @@ def _write_tap(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseControl
 
 def _do_write_read(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseController], tck: int, tdi: int, tdo: int, value: int):
     temp = 0
+
+    # Lower TCK for rising edge pulse first
+    dev.write(dev.read() & ~(1 << tck))
     for i in range(32):
-        _pulse_tdi(dev, tck, tdi, (value >> i) & 1)
+        _pulse_tdi_rising(dev, tck, tdi, (value >> i) & 1)
         _msleep(DELAY)
+
         if dev.read() & (1 << tdo):
             temp |= (1 << i)
 
@@ -329,6 +399,7 @@ def find_jtag_idcode(src: str, dummy: bool = False, mpsse: bool = False, max: in
                 for x in range(MAX_DEVICES):
                     idcodes.append(0)
                     for s in range(32):
+                        # Low, outputs TDO, High shifts the content
                         _pulse_tck(inDevice, tck)
                         _msleep(DELAY)
 
