@@ -880,8 +880,13 @@ class MainApp(main.main):
                     elif p[0] == "protocol" and p[1] == "dumpit":
                         res = self._sio.call(
                             "forward_reconnect", self._reconnect_token, timeout=5)
+                        
                         if not res["error"]:
                             self._reconnect_token = res["reconnect_token"]
+
+                        else:                            
+                            self._sio.disconnect()
+                        
 
                 except socketio.exceptions.TimeoutError:
                     pass
@@ -914,17 +919,15 @@ class MainApp(main.main):
                     elif p[0] == "protocol" and p[1] == "dumpit":
                         res = self._sio.call(
                             "forward_reconnect", self._reconnect_token, timeout=5)
+                        
                         if not res["error"]:
                             self._reconnect_token = res["reconnect_token"]
 
                             for l, id in self._logPushBuff:
                                 self._sio.emit(
                                     "log_req", {"data": l.decode("utf-8"), "id": id})
-                        else:
-                            try:
-                                self._sio.call("bye", "", timeout=30)
-                            except Exception:
-                                pass
+                                
+                        else:                            
                             self._sio.disconnect()
 
                     elif p[0] == "log_ack":
