@@ -849,7 +849,8 @@ class MainApp(main.main):
                     if self._isForward:
                         log_randid = random.randbytes(16).hex()
                         self._logPushBuff.append((l, log_randid))
-                        self._sio.emit("log_req", {"data": l.decode("utf-8"), "id": log_randid})
+                        self._sio.emit(
+                            "log_req", {"data": l.decode("utf-8"), "id": log_randid})
 
             except Exception:
                 pass
@@ -917,9 +918,10 @@ class MainApp(main.main):
                             self._reconnect_token = res["reconnect_token"]
 
                             for l, id in self._logPushBuff:
-                                self._sio.emit("log_req", {"data": l.decode("utf-8"), "id": id})
+                                self._sio.emit(
+                                    "log_req", {"data": l.decode("utf-8"), "id": id})
 
-                    elif p[0] == "log_ack":                        
+                    elif p[0] == "log_ack":
                         for e, (_, id) in enumerate(self._logPushBuff):
                             if id == p[1]:
                                 self._logPushBuff.pop(e)
@@ -1334,7 +1336,7 @@ class MainApp(main.main):
                 self._errMsgQueue = queue.Queue()
                 self._progMsgQueue = queue.Queue()
                 self._btnMsgQueue = queue.Queue()
-                
+
                 self._pong_flag.clear()
                 self._timeout_flag.clear()
                 self._logPushBuff.clear()
