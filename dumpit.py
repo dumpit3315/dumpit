@@ -916,8 +916,8 @@ class MainApp(main.main):
                         if not res["error"]:
                             self._reconnect_token = res["reconnect_token"]
 
-                        for l, id in self._logPushBuff:
-                            self._sio.emit("log_req", {"data": l.decode("utf-8"), "id": id})
+                            for l, id in self._logPushBuff:
+                                self._sio.emit("log_req", {"data": l.decode("utf-8"), "id": id})
 
                     elif p[0] == "log_ack":                        
                         for e, (_, id) in enumerate(self._logPushBuff):
