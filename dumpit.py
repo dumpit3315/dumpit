@@ -25,6 +25,7 @@ import uuid
 import platform
 import intelhex
 import datetime
+import random
 
 os.environ["WXSUPPRESS_SIZER_FLAGS_CHECK"] = "1"
 _PTRACKING = queue.Queue()
@@ -640,6 +641,7 @@ class MainApp(main.main):
         self._reconnect_token = None
 
         self._reconnecting = False
+        self._logPushBuff = []
 
         self._dumpThread = None
 
@@ -845,7 +847,9 @@ class MainApp(main.main):
                 if not self._logSupressed:
                     self._logThreadQueue.put(l.decode("utf-8"))
                     if self._isForward:
-                        self._sio.emit("log", l.decode("utf-8"))
+                        log_randid = random.randbytes(16).hex()
+                        self._logPushBuff.append((l, log_randid))
+                        self._sio.emit("log_req", {"data": l.decode("utf-8"), "id": log_randid})
 
             except Exception:
                 pass
@@ -911,6 +915,15 @@ class MainApp(main.main):
                             "forward_reconnect", self._reconnect_token, timeout=5)
                         if not res["error"]:
                             self._reconnect_token = res["reconnect_token"]
+
+                        for l, id in self._logPushBuff:
+                            self._sio.emit("log_req", {"data": l.decode("utf-8"), "id": id})
+
+                    elif p[0] == "log_ack":                        
+                        for e, (_, id) in enumerate(self._logPushBuff):
+                            if id == p[1]:
+                                self._logPushBuff.pop(e)
+                                break
 
                 except socketio.exceptions.TimeoutError:
                     pass
@@ -1232,6 +1245,7 @@ class MainApp(main.main):
 
             self._pong_flag.clear()
             self._timeout_flag.clear()
+            self._logPushBuff.clear()
 
             self._sioThread = threading.Thread(target=self._doWSLoop)
             self._sioThread.daemon = True
@@ -1320,9 +1334,10 @@ class MainApp(main.main):
                 self._errMsgQueue = queue.Queue()
                 self._progMsgQueue = queue.Queue()
                 self._btnMsgQueue = queue.Queue()
-
+                
                 self._pong_flag.clear()
                 self._timeout_flag.clear()
+                self._logPushBuff.clear()
 
                 self._logThread = threading.Thread(target=self._doLogging)
                 self._logThread.daemon = True
