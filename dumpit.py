@@ -1174,6 +1174,11 @@ class MainApp(main.main):
             self._reconnect_token = res["reconnect_token"]
             self._logThreadQueue.put("Reconnected to the remote.")
 
+            if self._isForward:
+                for l, id in self._logPushBuff:
+                    self._sio.emit(
+                        "log_req", {"data": l.decode("utf-8"), "id": id})
+
         except Exception as e:
             if self._sio and self._sio.connected:
                 try:
