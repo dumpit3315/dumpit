@@ -1153,7 +1153,7 @@ class MainApp(main.main):
             self._sio.disconnect()
             time.sleep(2)
 
-            self._sio = socketio.SimpleClient(handle_sigint=False)
+            self._sio = socketio.SimpleClient(handle_sigint=False, reconnection_delay=0.5, reconnection_delay_max=0.5)
             gc.collect()
 
             self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith(
@@ -1201,7 +1201,7 @@ class MainApp(main.main):
             except Exception:
                 pass
 
-            self._sio = socketio.SimpleClient(handle_sigint=False)
+            self._sio = socketio.SimpleClient(handle_sigint=False, reconnection_delay=0.5, reconnection_delay_max=0.5)
             gc.collect()
 
             self._doAnalytics("connect", type=2)
@@ -1285,7 +1285,7 @@ class MainApp(main.main):
             except Exception:
                 pass
 
-            self._sio = socketio.SimpleClient(handle_sigint=False)
+            self._sio = socketio.SimpleClient(handle_sigint=False, reconnection_delay=0.5, reconnection_delay_max=0.5)
             gc.collect()
 
             self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith(
@@ -2459,6 +2459,8 @@ def getInitCmd(self: MainApp):
 
 
 if __name__ == "__main__":
+    requests.packages.urllib3.util.connection.HAS_IPV6 = os.environ.get("DUMPIT_IPV4_ONLY", "0") == "1"
+
     app = wx.App(True)
     m = MainApp(None)
     m.Show()
