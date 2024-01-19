@@ -880,13 +880,12 @@ class MainApp(main.main):
                     elif p[0] == "protocol" and p[1] == "dumpit":
                         res = self._sio.call(
                             "forward_reconnect", self._reconnect_token, timeout=5)
-                        
+
                         if not res["error"]:
                             self._reconnect_token = res["reconnect_token"]
 
-                        else:                            
+                        else:
                             self._sio.disconnect()
-                        
 
                 except socketio.exceptions.TimeoutError:
                     pass
@@ -919,15 +918,15 @@ class MainApp(main.main):
                     elif p[0] == "protocol" and p[1] == "dumpit":
                         res = self._sio.call(
                             "forward_reconnect", self._reconnect_token, timeout=5)
-                        
+
                         if not res["error"]:
                             self._reconnect_token = res["reconnect_token"]
 
                             for l, id in self._logPushBuff:
                                 self._sio.emit(
                                     "log_req", {"data": l.decode("utf-8"), "id": id})
-                                
-                        else:                            
+
+                        else:
                             self._sio.disconnect()
 
                     elif p[0] == "log_ack":
@@ -1162,7 +1161,8 @@ class MainApp(main.main):
             self._sio.disconnect()
             time.sleep(2)
 
-            self._sio = socketio.SimpleClient(handle_sigint=False, reconnection_delay=0.5, reconnection_delay_max=0.5)
+            self._sio = socketio.SimpleClient(
+                handle_sigint=False, reconnection_delay=0.5, reconnection_delay_max=0.5)
             gc.collect()
 
             self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith(
@@ -1215,7 +1215,8 @@ class MainApp(main.main):
             except Exception:
                 pass
 
-            self._sio = socketio.SimpleClient(handle_sigint=False, reconnection_delay=0.5, reconnection_delay_max=0.5)
+            self._sio = socketio.SimpleClient(
+                handle_sigint=False, reconnection_delay=0.5, reconnection_delay_max=0.5)
             gc.collect()
 
             self._doAnalytics("connect", type=2)
@@ -1299,7 +1300,8 @@ class MainApp(main.main):
             except Exception:
                 pass
 
-            self._sio = socketio.SimpleClient(handle_sigint=False, reconnection_delay=0.5, reconnection_delay_max=0.5)
+            self._sio = socketio.SimpleClient(
+                handle_sigint=False, reconnection_delay=0.5, reconnection_delay_max=0.5)
             gc.collect()
 
             self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith(
@@ -1336,8 +1338,13 @@ class MainApp(main.main):
                 self._isConnectRemote = True
 
                 self.status.Value = f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n'
+
+                log_randid = random.randbytes(16).hex()
+                self._logPushBuff.append(
+                    (f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n'.encode("utf-8"), log_randid))
+
                 self._sio.emit(
-                    "log", f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n')
+                    "log_req", {"data": f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n', "id": log_randid})
 
                 self._ocd = subprocess.Popen([getOCDExec(
                 ), "-c", INIT_CMD], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -2473,7 +2480,8 @@ def getInitCmd(self: MainApp):
 
 
 if __name__ == "__main__":
-    requests.packages.urllib3.util.connection.HAS_IPV6 = os.environ.get("DUMPIT_IPV4_ONLY", "0") == "1"
+    requests.packages.urllib3.util.connection.HAS_IPV6 = os.environ.get(
+        "DUMPIT_IPV4_ONLY", "0") == "1"
 
     app = wx.App(True)
     m = MainApp(None)
