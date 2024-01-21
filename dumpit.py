@@ -1699,7 +1699,7 @@ class MainApp(main.main):
 
                     elif const._platforms[self.cChipset.Selection]["mode"] == 2:
                         self.cmd_write_u32(
-                            int(const._platforms[self.cChipset.Selection]["flash_addr"], 16), cOffset)
+                            int(const._platforms[self.cChipset.Selection]["flash_addr"], 16), cOffset >> 2 if self.cNandSize.Selection == 1 else cOffset)
 
                         for _ in range(4 if self.cNandSize.Selection == 1 else 1):
                             self.cmd_write_u32(

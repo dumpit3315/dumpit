@@ -162,3 +162,4 @@ cython_debug/
 dumpit_config.json
 test_data/
 imaginary_device/
+dumpit_resources/
