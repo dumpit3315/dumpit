@@ -1,0 +1,454 @@
+{    
+    "devids": {
+        "0x6e": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 256,
+            "flash_size": 1048576,
+            "block_size": 4,
+            "spare_size": 8
+        },
+        "0x64": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 256,
+            "flash_size": 2097152,
+            "block_size": 4,
+            "spare_size": 8
+        },
+        "0xe8": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 256,
+            "flash_size": 1048576,
+            "block_size": 4,
+            "spare_size": 8
+        },
+        "0xec": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 256,
+            "flash_size": 1048576,
+            "block_size": 4,
+            "spare_size": 8
+        },
+        "0xea": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 256,
+            "flash_size": 2097152,
+            "block_size": 4,
+            "spare_size": 8
+        },
+        "0x6b": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 4194304,
+            "block_size": 8,
+            "spare_size": 16
+        },
+        "0xe3": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 4194304,
+            "block_size": 8,
+            "spare_size": 16
+        },
+        "0xe5": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 4194304,
+            "block_size": 8,
+            "spare_size": 16
+        },
+        "0xd6": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 8388608,
+            "block_size": 8,
+            "spare_size": 16
+        },
+        "0x39": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 134217728,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0xe6": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 8388608,
+            "block_size": 8,
+            "spare_size": 16
+        },
+        "0x49": {
+            "is_16bit": true,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 134217728,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x59": {
+            "is_16bit": true,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 134217728,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x33": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 16777216,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x73": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 16777216,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x43": {
+            "is_16bit": true,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 16777216,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x53": {
+            "is_16bit": true,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 16777216,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x35": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 33554432,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x75": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 33554432,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x45": {
+            "is_16bit": true,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 33554432,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x55": {
+            "is_16bit": true,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 33554432,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x36": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 67108864,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x76": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 67108864,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x46": {
+            "is_16bit": true,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 67108864,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x56": {
+            "is_16bit": true,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 67108864,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x78": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 134217728,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x79": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 134217728,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x72": {
+            "is_16bit": true,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 134217728,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x74": {
+            "is_16bit": true,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 134217728,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0x71": {
+            "is_16bit": false,
+            "is_extended": false,
+            "page_size": 512,
+            "flash_size": 268435456,
+            "block_size": 16,
+            "spare_size": 16
+        },
+        "0xa2": {
+            "is_16bit": false,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 67108864,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xb2": {
+            "is_16bit": true,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 67108864,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xc2": {
+            "is_16bit": true,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 67108864,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xf2": {
+            "is_16bit": false,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 67108864,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xa1": {
+            "is_16bit": false,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 134217728,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xb1": {
+            "is_16bit": true,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 134217728,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xc1": {
+            "is_16bit": true,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 134217728,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xf1": {
+            "is_16bit": false,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 134217728,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xaa": {
+            "is_16bit": false,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 268435456,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xba": {
+            "is_16bit": true,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 268435456,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xca": {
+            "is_16bit": true,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 268435456,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xda": {
+            "is_16bit": false,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 268435456,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xac": {
+            "is_16bit": false,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 536870912,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xbc": {
+            "is_16bit": true,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 536870912,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xcc": {
+            "is_16bit": true,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 536870912,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xdc": {
+            "is_16bit": false,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 536870912,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xa3": {
+            "is_16bit": false,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 1073741824,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xb3": {
+            "is_16bit": true,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 1073741824,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xc3": {
+            "is_16bit": true,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 1073741824,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xd3": {
+            "is_16bit": false,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 1073741824,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xa5": {
+            "is_16bit": false,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 2147483648,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xb5": {
+            "is_16bit": true,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 2147483648,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xc5": {
+            "is_16bit": true,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 2147483648,
+            "block_size": 0,
+            "spare_size": 64
+        },
+        "0xd5": {
+            "is_16bit": false,
+            "is_extended": true,
+            "page_size": 0,
+            "flash_size": 2147483648,
+            "block_size": 0,
+            "spare_size": 64
+        }
+    },
+    "mfrids": {
+        "0x01": "AMD",
+        "0x9b": "ATO",
+        "0x92": "EON",
+        "0xc8": "ESMT",
+        "0x04": "FUJITSU",
+        "0xad": "HYNIX",
+        "0x89": "INTEL",
+        "0xc2": "MACRONIX",
+        "0x2c": "MICRON",
+        "0x8f": "NATIONAL",
+        "0x07": "RENESAS",
+        "0xec": "SAMSUNG",
+        "0x45": "SANDISK",
+        "0x20": "STMICRO",
+        "0x98": "TOSHIBA",
+        "0xef": "WINBOND"
+    }
+}

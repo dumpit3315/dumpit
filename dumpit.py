@@ -54,8 +54,41 @@ def _unbuffered(proc, stream='stdout'):
             yield out
 
 
+def get_arch_platform():
+    """
+    Finds if the platform is 32 or 64 bits
+    Several different ways are tried in case one fails
+    """
+    try:
+        import platform
+        archi_bits = 64 if platform.architecture()[0] == '64bit' else 32
+        return archi_bits
+    except:
+        pass
+    try:
+        import struct
+        archi_bits = struct.calcsize("P") * 8
+        return archi_bits
+    except:
+        pass
+    try:
+        import ctypes
+        archi_bits = ctypes.sizeof(ctypes.c_voidp) * 8
+        return archi_bits
+    except:
+        pass
+    try:
+        import sys
+        archi_bits = 64 if sys.maxsize > 2**32 else 32
+        return archi_bits
+    except:
+        pass
+    # default to 32 (is this safe)?
+    return 32
+
+
 def getOCDExec():
-    return os.path.join(os.path.dirname(__file__), f"ocd/{sys.platform}/bin/openocd")
+    return os.path.join(os.path.dirname(__file__), f"ocd/{sys.platform}-{get_arch_platform()}/bin/openocd")
 
 
 def _msleep(dur: int):
@@ -693,6 +726,9 @@ class MainApp(main.main):
         self.nsrst_reset_pulse = 100
 
         self.reset_delay = 100
+
+        self._nand_idcodes = json.load(
+            open(os.path.join(os.path.dirname(__file__), "nand_ids.json"), "r"))
 
         if os.path.exists(os.path.join(os.path.dirname(__file__), "dumpit_config.json")):
             cfg = json.load(
