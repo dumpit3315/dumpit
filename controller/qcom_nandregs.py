@@ -1,6 +1,12 @@
 import enum
 import time
 import typing
+from .regs.msm7200 import *
+
+_DEBUG_CONTROLLER = False
+
+class NANDException(Exception):
+    pass
 
 
 class _BaseQCOMNANDController():
@@ -22,23 +28,36 @@ class _BaseQCOMNANDController():
         self._d2_prev_cfg2 = 0
         self._prev_common_cfg = 0
 
-    def read(self, offset: int, size: int):
+    def read(self, page: int):
         raise NotImplementedError()
 
-    def write(self, offset: int, size: int, data: typing.Union[bytes, bytearray]):
+    def write(self, page: int, data: typing.Union[bytes, bytearray]):
         raise NotImplementedError()
 
-    def erase(self, offset: int, size: int):
+    def erase(self, page: int):
         raise NotImplementedError()
 
 
-def get_bit(ctrl: _BaseQCOMNANDController, addr: int, bits):
-    return (ctrl._cmd_read(addr) >> bits[0]) & bits[1]
+def get_bit(ctrl: _BaseQCOMNANDController, addr: int, bits: enum.Enum):
+    if _DEBUG_CONTROLLER: print(f"GB: (*({hex(addr)}) >> {bits.value[0]}) & {hex(bits.value[1])}")
+    return (ctrl._cmd_read(addr) >> bits.value[0]) & bits.value[1]
 
 
-def set_bit(ctrl: _BaseQCOMNANDController, addr: int, bits, value: int):
-    bitMask = bits[1] << bits[0]
-    ctrl._cmd_write((ctrl._cmd_read(addr) & ~bitMask) | value & bits[1])
+def set_bit(ctrl: _BaseQCOMNANDController, addr: int, bits: enum.Enum, value: int):
+    bitMask = bits.value[1] << bits.value[0]
+    if _DEBUG_CONTROLLER: print(f"SB: (*({hex(addr)}) & ~{hex(bitMask)}) | (({hex(value)} & {hex(bits.value[1])}) << {bits.value[0]})")
+    ctrl._cmd_write(addr, (ctrl._cmd_read(addr) & ~bitMask)
+                    | ((value & bits.value[1]) << bits.value[0]))
+
+def get_bit_var(var: int, bits: enum.Enum):
+    if _DEBUG_CONTROLLER: print(f"GBV: ({hex(var)} >> {bits.value[0]}) & {hex(bits.value[1])}")
+    return (var >> bits.value[0]) & bits.value[1]
+
+
+def set_bit_var(var: int, bits: enum.Enum, value: int):
+    bitMask = bits.value[1] << bits.value[0]
+    if _DEBUG_CONTROLLER: print(f"SBV: ({hex(var)} & ~{hex(bitMask)}) | (({hex(value)} & {hex(bits.value[1])}) << {bits.value[0]})")
+    return (var & ~bitMask) | ((value & bits.value[1]) << bits.value[0])
 
 
 class MSM6250_6800_NANDOPS(enum.Enum):
@@ -79,7 +98,7 @@ class MSM6250_MSM6800_NANDADDR_BITS_MASK(enum.Enum):
 class MSM6250_MSM6800_NANDCMD_BITS_MASK(enum.Enum):
     OP_CMD = (0, 0x7)
     SW_CMD_EN = (3, 0x1)
-    SW_CMD_VAL = (4, 0x8)
+    SW_CMD_VAL = (4, 0xff)
     SW_CMD_ADDR_SEL = (12, 0x1)
     SW_CMD1_REPLACE = (13, 0x1)
     SW_CMD2_REPLACE = (14, 0x1)
@@ -95,8 +114,8 @@ class MSM6250_NANDSTATUS_BITS_MASK(enum.Enum):
     OP_FAILURE = (0, 0x88)
     READY_BUSY_N_STATUS = (13, 0x1)
     WRITE_PROTECT = (14, 0x1)
-    NAND_DEVID = (15, 0x8)
-    NAND_MFRID = (23, 0x8)
+    NAND_DEVID = (15, 0xff)
+    NAND_MFRID = (23, 0xff)
     READ_ERROR = (31, 0x1)
 
 
@@ -138,67 +157,67 @@ class MSM6250NANDController(_BaseQCOMNANDController):
             self._cmd_write(0x84000180, 0)
 
         self._prev_cfg1 = self._cmd_read(
-            self._nfi_base + MSM6250_NANDREGS.FLASH_CFG1)
+            self._nfi_base + MSM6250_NANDREGS.FLASH_CFG1.value)
 
         if not self._skip_reg_init:
             self._cmd_write(self._nfi_base +
-                            MSM6250_NANDREGS.FLASH_CFG1, 0x253)
-        self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CMD,
-                        MSM6250_6800_NANDOPS.RESET_NAND)
+                            MSM6250_NANDREGS.FLASH_CFG1.value, 0x253)
+        self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CMD.value,
+                        MSM6250_6800_NANDOPS.RESET_NAND.value)
 
-        while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
+        while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS.value, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
             time.sleep(0.05)
 
-        self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CMD,
-                        MSM6250_6800_NANDOPS.ID_FETCH)
+        self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CMD.value,
+                        MSM6250_6800_NANDOPS.ID_FETCH.value)
 
-        while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
+        while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS.value, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
             time.sleep(0.05)
 
-        self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CMD,
-                        MSM6250_6800_NANDOPS.STATUS_CHECK)
+        self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CMD.value,
+                        MSM6250_6800_NANDOPS.STATUS_CHECK.value)
 
-        while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
+        while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS.value, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
             time.sleep(0.05)
 
-        self._idcode = (get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS, MSM6250_NANDSTATUS_BITS_MASK.NAND_MFRID)
-                        << 24) | (get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS, MSM6250_NANDSTATUS_BITS_MASK.NAND_DEVID) << 16)
+        self._idcode = (get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS.value, MSM6250_NANDSTATUS_BITS_MASK.NAND_MFRID)
+                        << 24) | (get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS.value, MSM6250_NANDSTATUS_BITS_MASK.NAND_DEVID) << 16)
 
-    def read(self, offset: int, size: int):
+    def read(self, page: int):
         if not self._skip_reg_init:
-            self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CMD,
-                            MSM6250_6800_NANDOPS.RESET)
+            self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CMD.value,
+                            MSM6250_6800_NANDOPS.RESET.value)
 
-            while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
+            while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS.value, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
                 time.sleep(0.05)
 
-        self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CMD,
-                        MSM6250_6800_NANDOPS.RESET_NAND)
+        self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CMD.value,
+                        MSM6250_6800_NANDOPS.RESET_NAND.value)
 
-        while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
+        while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS.value, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
             time.sleep(0.05)
 
         if not self._skip_reg_init:
-            self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CFG1,
+            self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CFG1.value,
                             0x25a | (0 if self.ecc_enabled else 1))
         else:
-            set_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_CFG1,
+            set_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_CFG1.value,
                     MSM6250_NANDCFG_BITS_MASK.ECC_DISABLED, (0 if self.ecc_enabled else 1))
 
-        set_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_ADDR,
-                MSM6250_MSM6800_NANDADDR_BITS_MASK.FLASH_PAGE_ADDRESS, offset >> 9)
+        set_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_ADDR.value,
+                MSM6250_MSM6800_NANDADDR_BITS_MASK.FLASH_PAGE_ADDRESS, page)
 
         self._cmd_write(self._nand_int_clr_addr, self._nand_reset_op)
         while (self._cmd_read(self._nand_int_addr) & self._nand_reset_op) != 0:
             time.sleep(0.05)
 
-        self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CMD,
-                        MSM6250_6800_NANDOPS.PAGE_READ)
+        self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CMD.value,
+                        MSM6250_6800_NANDOPS.PAGE_READ.value)
 
-        while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
+        while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS.value, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
             time.sleep(0.05)
 
-        return self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER), self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER + 0x210)
+        return self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value, 0x200), self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 0x200, 0x10), b""
 
 
 class MSM6800_NANDREGS(enum.Enum):
@@ -242,14 +261,14 @@ class MSM6800_NANDCOMMONCFG_BITS_MASK(enum.Enum):
 
 
 class NAND_EXTID_BITS():
-    NAND_PAGESIZE = (0, 0x3)
-    NAND_BLOCKSIZE = (4, 0x3)
+    NAND_PAGESIZE = (0, 0x7)
+    NAND_BLOCKSIZE = (4, 0x7)
 
 
 class MSM6800_NANDFLASHID_BITS_MASK(enum.Enum):
-    NAND_DEVID = (0, 0x8)
-    NAND_MFRID = (8, 0x8)
-    NAND_EXTID = (16, 0x8)
+    NAND_DEVID = (0, 0xff)
+    NAND_MFRID = (8, 0xff)
+    NAND_EXTID = (16, 0xff)
 
 
 class MSM6800_NANDCFG1_BITS_MASK(enum.Enum):
@@ -271,7 +290,7 @@ class MSM6800_NANDCFG2_BITS_MASK(enum.Enum):
 
 
 class MSM6800NANDController(_BaseQCOMNANDController):
-    def __init__(self, read32_func, write32_func, read8_func, write8_func, base: int = 0x60000000, page_size: int = -1, skip_init: bool = False, skip_gpio_init: bool = False, devid: int = 0, nand_int_clr_addr: int = 0x80000414, nand_int_addr: int = 0x80000488, nand_op_reset_flag: int = 2, custom_cfg1: int = -1, custom_cfg2: int = -1, custom_common_cfg: int = -1):
+    def __init__(self, read32_func, write32_func, read8_func, write8_func, base: int = 0x60000000, page_size: int = -1, skip_init: bool = False, skip_gpio_init: bool = False, devid: int = 0, nand_int_clr_addr: int = 0x80000414, nand_int_addr: int = 0x80000488, nand_op_reset_flag: int = 2, custom_cfg1: int = -1, custom_cfg2: int = -1, custom_common_cfg: int = -1, force_autoprobe: bool = False):
         super().__init__(read32_func, write32_func, read8_func, write8_func, base, page_size)
 
         self._nand_int_clr_addr = nand_int_clr_addr
@@ -280,107 +299,112 @@ class MSM6800NANDController(_BaseQCOMNANDController):
         self._skip_reg_init = skip_init
         self._skip_gpio_init = skip_gpio_init
         self._device_id = devid
-        self._page_size = page_size
 
         if not self._skip_gpio_init:
             for i in range(8):
                 self._cmd_write(0x80000900 + (i * 4), 0xffffffff)
 
         self._prev_cfg1 = self._cmd_read(
-            self._nfi_base + MSM6800_NANDREGS.FLASH_CFG1_FLASH1)
+            self._nfi_base + MSM6800_NANDREGS.FLASH_CFG1_FLASH1.value)
 
         self._prev_cfg2 = self._cmd_read(
-            self._nfi_base + MSM6800_NANDREGS.FLASH_CFG2_FLASH1)
+            self._nfi_base + MSM6800_NANDREGS.FLASH_CFG2_FLASH1.value)
 
         self._d2_prev_cfg1 = self._cmd_read(
-            self._nfi_base + MSM6800_NANDREGS.FLASH_CFG1_FLASH2)
+            self._nfi_base + MSM6800_NANDREGS.FLASH_CFG1_FLASH2.value)
 
         self._d2_prev_cfg2 = self._cmd_read(
-            self._nfi_base + MSM6800_NANDREGS.FLASH_CFG1_FLASH2)
+            self._nfi_base + MSM6800_NANDREGS.FLASH_CFG2_FLASH2.value)
 
         self._prev_common_cfg = self._cmd_read(
-            self._nfi_base + MSM6800_NANDREGS.FLASH_COMMON_CFG)
+            self._nfi_base + MSM6800_NANDREGS.FLASH_COMMON_CFG.value)
 
         if not self._skip_reg_init:
             self._cmd_write(self._nfi_base +
-                            MSM6800_NANDREGS.FLASH_CFG1_FLASH1, 0xa2)
+                            MSM6800_NANDREGS.FLASH_CFG1_FLASH1.value, 0xa2)
 
             self._cmd_write(self._nfi_base +
-                            MSM6800_NANDREGS.FLASH_CFG1_FLASH2, 0x22)
+                            MSM6800_NANDREGS.FLASH_CFG1_FLASH2.value, 0x22)
 
-        self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD,
-                        MSM6250_6800_NANDOPS.RESET_NAND)
+        self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD.value,
+                        MSM6250_6800_NANDOPS.RESET_NAND.value)
 
-        while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
+        while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
             time.sleep(0.05)
 
-        self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD,
-                        MSM6250_6800_NANDOPS.RESET_NAND)
+        self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD.value,
+                        MSM6250_6800_NANDOPS.ID_FETCH.value)
 
-        while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
+        while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
             time.sleep(0.05)
 
-        self._idcode = (get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_ID_DATA, MSM6800_NANDFLASHID_BITS_MASK.NAND_MFRID) << 24) | (get_bit(self, self._nfi_base +
-                                                                                                                                                   MSM6800_NANDREGS.FLASH_ID_DATA, MSM6800_NANDFLASHID_BITS_MASK.NAND_DEVID) << 16) | get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_ID_DATA, MSM6800_NANDFLASHID_BITS_MASK.NAND_EXTID)
-        if get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS, MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_DONE) != 0:
-            self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_COMMON_CFG,
-                            1 << MSM6800_NANDCOMMONCFG_BITS_MASK.NAND_AUTOPROBE[0])
-            self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD,
-                            MSM6250_6800_NANDOPS.PAGE_READ)
+        self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD.value,
+                        MSM6250_6800_NANDOPS.STATUS_CHECK.value)
 
-            while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
+        while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
+            time.sleep(0.05)
+
+        self._idcode = (get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_ID_DATA.value, MSM6800_NANDFLASHID_BITS_MASK.NAND_MFRID) << 24) | (get_bit(self, self._nfi_base +
+                                                                                                                                                         MSM6800_NANDREGS.FLASH_ID_DATA.value, MSM6800_NANDFLASHID_BITS_MASK.NAND_DEVID) << 16) | get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_ID_DATA.value, MSM6800_NANDFLASHID_BITS_MASK.NAND_EXTID)
+        if get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_DONE) != 0 or force_autoprobe:
+            self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_COMMON_CFG.value,
+                            1 << MSM6800_NANDCOMMONCFG_BITS_MASK.NAND_AUTOPROBE.value[0])
+            self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD.value,
+                            MSM6250_6800_NANDOPS.PAGE_READ.value)
+
+            while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
                 time.sleep(0.05)
 
         if self._page_size == -1:
-            self._page_size = get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS,
+            self._page_size = get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value,
                                       MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_ISLARGE)
 
-        self._page_width = get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS,
+        self._page_width = get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value,
                                    MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_IS16BIT)
 
         self._set_common_cfg = custom_common_cfg if custom_common_cfg != -1 else 0x3
         self._set_cfg2 = custom_cfg2 if custom_cfg2 != -1 else 0x4219442
-        self._set_cfg1 = custom_cfg1 if custom_cfg1 != -1 else (0xa | (self._page_size << MSM6800_NANDCFG1_BITS_MASK.PAGE_IS_2KB[0]) | (
-            self._page_width << MSM6800_NANDCFG1_BITS_MASK.WIDE_NAND[0]) | (get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS, MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_DONE) << 31))
+        self._set_cfg1 = custom_cfg1 if custom_cfg1 != -1 else (0xa | (self._page_size << MSM6800_NANDCFG1_BITS_MASK.PAGE_IS_2KB.value[0]) | (
+            self._page_width << MSM6800_NANDCFG1_BITS_MASK.WIDE_NAND.value[0]) | (get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_DONE) << 31))
 
         if self._skip_reg_init:
-            self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_COMMON_CFG,
+            self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_COMMON_CFG.value,
                             self._prev_common_cfg)
 
-    def read(self, offset: int, size: int):
+    def read(self, page: int):
         if not self._skip_reg_init:
-            self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD,
-                            MSM6250_6800_NANDOPS.RESET)
+            self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD.value,
+                            MSM6250_6800_NANDOPS.RESET.value)
 
-            while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
+            while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
                 time.sleep(0.05)
 
-        self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD,
-                        MSM6250_6800_NANDOPS.RESET_NAND)
+        self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD.value,
+                        MSM6250_6800_NANDOPS.RESET_NAND.value)
 
-        while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
+        while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
             time.sleep(0.05)
 
         if not self._skip_reg_init:
             self._cmd_write(
-                self._nfi_base + MSM6800_NANDREGS.FLASH_COMMON_CFG, self._set_common_cfg)
+                self._nfi_base + MSM6800_NANDREGS.FLASH_COMMON_CFG.value, self._set_common_cfg)
             self._cmd_write(self._nfi_base +
-                            MSM6800_NANDREGS.FLASH_CFG1_FLASH1, self._set_cfg1)
+                            MSM6800_NANDREGS.FLASH_CFG1_FLASH1.value, self._set_cfg1)
             self._cmd_write(self._nfi_base +
-                            MSM6800_NANDREGS.FLASH_CFG1_FLASH2, self._set_cfg1)
+                            MSM6800_NANDREGS.FLASH_CFG1_FLASH2.value, self._set_cfg1)
             self._cmd_write(self._nfi_base +
-                            MSM6800_NANDREGS.FLASH_CFG2_FLASH1, self._set_cfg2)
+                            MSM6800_NANDREGS.FLASH_CFG2_FLASH1.value, self._set_cfg2)
             self._cmd_write(self._nfi_base +
-                            MSM6800_NANDREGS.FLASH_CFG2_FLASH2, self._set_cfg2)
+                            MSM6800_NANDREGS.FLASH_CFG2_FLASH2.value, self._set_cfg2)
 
-        set_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_CFG1_FLASH1,
+        set_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_CFG1_FLASH1.value,
                 MSM6800_NANDCFG1_BITS_MASK.ECC_DISABLED, (0 if self.ecc_enabled else 1))
 
-        set_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_CFG1_FLASH2,
+        set_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_CFG1_FLASH2.value,
                 MSM6800_NANDCFG1_BITS_MASK.ECC_DISABLED, (0 if self.ecc_enabled else 1))
 
-        set_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_ADDR,
-                MSM6250_MSM6800_NANDADDR_BITS_MASK.FLASH_PAGE_ADDRESS, (offset >> 11) if self._page_size == 1 else (offset >> 9))
+        set_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_ADDR.value,
+                MSM6250_MSM6800_NANDADDR_BITS_MASK.FLASH_PAGE_ADDRESS, page)
 
         self._cmd_write(self._nand_int_clr_addr, self._nand_reset_op)
         while (self._cmd_read(self._nand_int_addr) & self._nand_reset_op) != 0:
@@ -390,18 +414,18 @@ class MSM6800NANDController(_BaseQCOMNANDController):
         tempbuf_spare = bytearray()
 
         for _ in range(4 if self._page_size == 1 else 1):
-            self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD,
-                            MSM6250_6800_NANDOPS.PAGE_READ)
+            self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD.value,
+                            MSM6250_6800_NANDOPS.PAGE_READ.value)
 
-            while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
+            while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
                 time.sleep(0.05)
 
             tempbuf += self._mem_read(self._nfi_base +
-                                      MSM6800_NANDREGS.FLASH_BUFFER)
+                                      MSM6800_NANDREGS.FLASH_BUFFER.value, 0x200)
             tempbuf_spare += self._mem_read(self._nfi_base +
-                                            MSM6800_NANDREGS.FLASH_BUFFER + 0x210)
+                                            MSM6800_NANDREGS.FLASH_BUFFER.value + 0x200, 0x10)
 
-        return bytes(tempbuf), bytes(tempbuf_spare)
+        return bytes(tempbuf), bytes(tempbuf_spare), b""
 
 
 class MSM7200_JTAGTAPCONTROL_BITS_MASK(enum.Enum):
@@ -495,32 +519,213 @@ class MSM7200_NANDOPS(enum.Enum):
     RESET_NAND = 0x0D
 
 
-class MSM7200_NANDOPS_RAW(enum.Enum):
-    RESET = 1
-    PAGE_READ = 2
-    PAGE_READ_ECC = 3
-    PAGE_READ_ALL = 4
-    SEQ_PAGE_READ = 5
-    PRG_PAGE = 6
-    PRG_PAGE_ECC = 7
-    PRG_PAGE_ALL = 9
-    BLOCK_ERASE = 10
-    FETCH_ID = 11
-    STATUS = 12
-    RESET_NAND = 13
-
-
-class MSM7200_NANDFLASHCMD_BITS_MASK(enum.Enum):
-    OP_CMD = (0, 4)
-    PAGE_ACC = (4, 1)
-    LAST_PAGE = (5, 1)
-    AUTO_DETECT = (6, 1)
-    AUTO_DETECT_DATA_XFR_SIZE = (7, 0x3ff)
-
-
 class MSM7200NANDController(_BaseQCOMNANDController):
-    def __init__(self, read32_func, write32_func, read8_func, write8_func, base: int = 0xa0a00000, page_size: int = -1, skip_init: bool = False, devid: int = 0, custom_cfg1: int = -1, custom_cfg2: int = -1, is_qsc6270: bool = False):
+    def __init__(self, read32_func, write32_func, read8_func, write8_func, base: int = 0xa0a00000, page_size: int = -1, devid: int = 0, skip_init: bool = False, custom_cfg1: int = -1, custom_cfg2: int = -1, bb_in_data: bool = False, set_jtag_ctl: bool = True, disable_mpu: bool = True, raise_on_autoprobe_fail: bool = True):
         super().__init__(read32_func, write32_func, read8_func, write8_func, base, page_size)
+        self._skip_reg_init = skip_init
+        self._bb_in_data = bb_in_data
+        self._cfg1 = custom_cfg1
+        self._cfg2 = custom_cfg2
+        self._device_id = devid
 
-    def read(self, offset: int, size: int):
+        if set_jtag_ctl:
+            self._cmd_write(
+                0xA900026C, MSM7200_JTAGTAPCONTROL_VALUES.ARM9_11_RTCK.value)
+        if disable_mpu:
+            self._cmd_write(self._nfi_base + MSM7200_NANDREGS.NAND_MPU_ENABLE.value,
+                            MSM7200_JTAGNANDMPU_VALUES.DISABLE_NAND_MPU.value)
+
+        self._prev_cfg1 = self._cmd_read(
+            self._nfi_base + MSM7200_NANDREGS.DEV0_CFG0.value)
+
+        self._prev_cfg2 = self._cmd_read(
+            self._nfi_base + MSM7200_NANDREGS.DEV0_CFG1.value)
+
+        self._d2_prev_cfg1 = self._cmd_read(
+            self._nfi_base + MSM7200_NANDREGS.DEV1_CFG0.value)
+
+        self._d2_prev_cfg2 = self._cmd_read(
+            self._nfi_base + MSM7200_NANDREGS.DEV1_CFG1.value)
+
+        if not self._skip_reg_init:
+            self._cmd_write(
+                self._nfi_base + MSM7200_NANDREGS.DEV0_CFG0.value, 0xaad400da)  # Reset 1
+            self._cmd_write(
+                self._nfi_base + MSM7200_NANDREGS.DEV0_CFG1.value, 0x44747c)  # Reset 2
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.DEV_CMD_VLD.value, 0xd)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.DEV_CMD0.value, 0x1080d060)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.DEV_CMD1.value, 0xf00f3000)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.DEV_CMD2.value, 0xf0ff7090)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.DEV_CMD3.value, 0xf0ff7090)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.DEV_CMD4.value, 0x800000)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.DEV_CMD5.value, 0xf30094)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.DEV_CMD6.value, 0x40e0)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.FLASH_CHIP_SELECT.value, devid)
+
+        self._send_cmd(MSM7200_NANDOPS.RESET.value)
+        self._send_cmd(MSM7200_NANDOPS.RESET_NAND.value)
+
+        self._cmd_write(self._nfi_base + MSM7200_NANDREGS.ADDR0.value, 0x0)
+        self._cmd_write(self._nfi_base + MSM7200_NANDREGS.ADDR1.value, 0x0)
+
+        self._send_cmd((4 << MSM7200_NAND_FLASH_CMD_BITS_MASK.AUTO_DETECT_DATA_XFR_SIZE.value[0]) | (1 << MSM7200_NAND_FLASH_CMD_BITS_MASK.AUTO_DETECT.value[0]) | (1 << MSM7200_NAND_FLASH_CMD_BITS_MASK.LAST_PAGE.value[0]) | (
+            1 << MSM7200_NAND_FLASH_CMD_BITS_MASK.PAGE_ACC.value[0]) | (MSM7200_NAND_FLASH_CMD_OP_CMD_VALUES.PAGE_READ.value << MSM7200_NAND_FLASH_CMD_BITS_MASK.OP_CMD.value[0]))
+
+        if get_bit(self, self._nfi_base + MSM7200_NANDREGS.FLASH_STATUS.value, MSM7200_NAND_FLASH_STATUS_BITS_MASK.OP_ERR) or not get_bit(self, self._nfi_base + MSM7200_NANDREGS.FLASH_STATUS.value, MSM7200_NAND_FLASH_STATUS_BITS_MASK.AUTO_DETECT_DONE):
+            if raise_on_autoprobe_fail:
+                raise NANDException("NAND autoprobe failed")
+
+        if self._page_size == -1:
+            self._page_size = get_bit(self, self._nfi_base + MSM7200_NANDREGS.FLASH_STATUS.value,
+                                      MSM7200_NAND_FLASH_STATUS_BITS_MASK.FIELD_2KBYTE_DEVICE)
+
+        self._send_cmd(MSM7200_NANDOPS.FETCH_ID.value)
+        self._page_width = 0
+        self._idcode = ((self._cmd_read(self._nfi_base + MSM7200_NANDREGS.READ_ID.value) & 0xff) << 24) | (((self._cmd_read(self._nfi_base + MSM7200_NANDREGS.READ_ID.value) >> 8) & 0xff)
+                                                                                                           << 16) | (((self._cmd_read(self._nfi_base + MSM7200_NANDREGS.READ_ID.value) >> 16) & 0xff) << 8) | ((self._cmd_read(self._nfi_base + MSM7200_NANDREGS.READ_ID.value) >> 24) & 0xff)
+        self._isFirst = False
+
+    def _send_cmd(self, cmd_no: int):
+        self._cmd_write(self._nfi_base +
+                        MSM7200_NANDREGS.FLASH_CMD.value, cmd_no)
+        self._cmd_write(self._nfi_base + MSM7200_NANDREGS.EXEC_CMD.value, 1)
+        while get_bit(self, self._nfi_base + MSM7200_NANDREGS.FLASH_STATUS.value, MSM7200_NAND_FLASH_STATUS_BITS_MASK.OPER_STATUS) != 0:
+            time.sleep(0.05)
+
+    def read(self, page: int):
+        if not self._isFirst:
+            self._isFirst = True
+            if self._cfg1 == -1 or self._cfg2 == -1:
+                self._cfg1 = 0xaad400da
+                self._cfg2 = 0x44747c
+            
+                self._cfg2 = set_bit_var(self._cfg2,
+                        MSM7200_NAND_DEV_CFG1_BITS_MASK.WIDE_FLASH, self._page_width)
+                self._cfg1 = set_bit_var(self._cfg1,
+                        MSM7200_NAND_DEV_CFG0_BITS_MASK.CW_PER_PAGE, 3 if self._page_size == 1 else 0)
+                if self._bb_in_data:
+                    self._cfg2 = set_bit_var(self._cfg2,
+                            MSM7200_NAND_DEV_CFG1_BITS_MASK.BAD_BLOCK_BYTE_NUM, 0x1d1)
+                    self._cfg2 = set_bit_var(self._cfg2,
+                            MSM7200_NAND_DEV_CFG1_BITS_MASK.BAD_BLOCK_IN_SPARE_AREA, 0x0)
+                elif not self._bb_in_data and self._page_width == 0:
+                    self._cfg2 = set_bit_var(self._cfg2,
+                            MSM7200_NAND_DEV_CFG1_BITS_MASK.BAD_BLOCK_BYTE_NUM, 0x6)
+                    self._cfg2 = set_bit_var(self._cfg2,
+                            MSM7200_NAND_DEV_CFG1_BITS_MASK.BAD_BLOCK_IN_SPARE_AREA, 0x1)
+                elif not self._bb_in_data and self._page_width == 1:
+                    self._cfg2 = set_bit_var(self._cfg2,
+                            MSM7200_NAND_DEV_CFG1_BITS_MASK.BAD_BLOCK_BYTE_NUM, 0x1)
+                    self._cfg2 = set_bit_var(self._cfg2,
+                            MSM7200_NAND_DEV_CFG1_BITS_MASK.BAD_BLOCK_IN_SPARE_AREA, 0x1)
+
+                if _DEBUG_CONTROLLER:
+                    print(f":-CFG1: {hex(self._cfg1)}")
+                    print(f":-CFG2: {hex(self._cfg2)}")
+
+        if not self._skip_reg_init:
+            self._send_cmd(MSM7200_NANDOPS.RESET.value)
+        self._send_cmd(MSM7200_NANDOPS.RESET_NAND.value)
+
+        if not self._skip_reg_init:
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.DEV0_CFG0.value, self._cfg1)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.DEV0_CFG1.value, self._cfg2)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.DEV1_CFG0.value, self._cfg1)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.DEV1_CFG1.value, self._cfg2)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.DEV_CMD_VLD.value, 0xd)
+
+        set_bit(self, self._nfi_base + MSM7200_NANDREGS.DEV0_CFG1.value,
+                MSM7200_NAND_DEV_CFG1_BITS_MASK.ECC_DISABLE, (0 if self.ecc_enabled else 1))
+        set_bit(self, self._nfi_base + MSM7200_NANDREGS.DEV1_CFG1.value,
+                MSM7200_NAND_DEV_CFG1_BITS_MASK.ECC_DISABLE, (0 if self.ecc_enabled else 1))
+
+        temp_addr = page << (16 if self._page_size == 1 else 8)
+        self._cmd_write(self._nfi_base +
+                        MSM7200_NANDREGS.ADDR0.value, temp_addr & 0xffffffff)
+        self._cmd_write(self._nfi_base + MSM7200_NANDREGS.ADDR1.value,
+                        (temp_addr >> 32) & 0xffffffff)
+
+        self._cmd_write(self._nfi_base +
+                        MSM7200_NANDREGS.FLASH_CMD.value, MSM7200_NANDOPS.PAGE_READ_ALL.value)
+
+        tempbuf = bytearray()
+        tempbuf_spare = bytearray()
+        tempbuf_bbm = bytearray()
+
+        for _ in range(4 if self._page_size == 1 else 1):
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.EXEC_CMD.value, 1)
+            while get_bit(self, self._nfi_base + MSM7200_NANDREGS.FLASH_STATUS.value, MSM7200_NAND_FLASH_STATUS_BITS_MASK.OPER_STATUS) != 0:
+                time.sleep(0.05)
+
+            temp_mem = self._mem_read(self._nfi_base +
+                                      MSM7200_NANDREGS.FLASH_BUFFER.value, 0x210)
+
+            if self._bb_in_data:
+                tempbuf += temp_mem[:0x1d0] + temp_mem[0x1d2:0x202]
+                tempbuf_bbm += temp_mem[0x1d0:0x1d2]
+                tempbuf_spare += temp_mem[0x202:] + b"\xff\xff"
+
+            else:
+                tempbuf += temp_mem[:0x200]
+                tempbuf_spare += temp_mem[0x200:]
+
+        return bytes(tempbuf), bytes(tempbuf_spare), bytes(tempbuf_bbm)
+
+
+def _moduletest():
+    global _DEBUG_CONTROLLER
+    _DEBUG_CONTROLLER = True
+
+    def dummy_cmd_read(offset):
+        print(f"CMD READ {hex(offset)}")
+        return 0x0
+
+    def dummy_cmd_write(offset, value):
+        print(f"CMD WRITE {hex(offset)} {hex(value)} {bin(value)}")
+
+    def dummy_mem_read(offset, size):
+        print(f"MEM READ {hex(offset)} {hex(size)}")
+        return b"\xff"*size
+
+    def dummy_mem_write(offset, data):
+        print(f"MEM WRITE {hex(offset)} {data}")
         pass
+
+    print("6250")    
+    test = MSM6250NANDController(
+        dummy_cmd_read, dummy_cmd_write, dummy_mem_read, dummy_mem_write)
+    print("-READ")
+    print(test.read(8))
+
+    print("6275")    
+    test = MSM6800NANDController(
+        dummy_cmd_read, dummy_cmd_write, dummy_mem_read, dummy_mem_write, force_autoprobe=True)
+    print("-READ")
+    print(test.read(8))
+
+    print("7200")    
+    test = MSM7200NANDController(
+        dummy_cmd_read, dummy_cmd_write, dummy_mem_read, dummy_mem_write, raise_on_autoprobe_fail=False)
+    print("-READ")
+    print(test.read(8))
+
+    print("7200_BBM")    
+    test = MSM7200NANDController(
+        dummy_cmd_read, dummy_cmd_write, dummy_mem_read, dummy_mem_write, raise_on_autoprobe_fail=False, bb_in_data=True)
+    print("-READ")
+    print(test.read(8))
