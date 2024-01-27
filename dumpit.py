@@ -1713,19 +1713,12 @@ class MainApp(main.main):
 
             elif selPlat["mode"] == 2:
                 NANDC = qcom_nandregs.MSM6800NANDController(self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u8, None,
-                                                            selPlat["flash_regs"], nand_int_clr_addr=selPlat["flash_int_clear"], nand_int_addr=selPlat["flash_int"], nand_op_reset_flag=selPlat["flash_nand_int"], page_size=(-1 if self.cNandSize.Selection == 2 else self.cNandSize.Selection))
+                                                            selPlat["flash_regs"], nand_int_clr_addr=selPlat["flash_int_clear"], nand_int_addr=selPlat["flash_int"], nand_op_reset_flag=selPlat["flash_nand_int"], page_size=(-1 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), page_width=self.page_width)
                 assert NANDC._idcode not in [
                     0x0, 0xffffffff], "NAND detect failed"
 
                 MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
-                DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
-
-                if self.page_width == -1:
-                    if DEV_ID_HEX in self._nand_idcodes["devids"]:
-                        NANDC._page_width = int(
-                            self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"])
-                else:
-                    NANDC._page_width = self.page_width
+                DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'                
 
                 if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
                     self._logThreadQueue.push(
