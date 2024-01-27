@@ -5,6 +5,7 @@ from res import forwardDialog
 from res import ft232r_pinconfig
 from res import ft232h_pinconfig
 from res import resetDelay
+from res import nandControlConfig
 import os
 import sys
 import const
@@ -26,6 +27,8 @@ import platform
 import intelhex
 import datetime
 import random
+from controller import qcom_nandregs
+from controller import common_nandregs
 
 os.environ["WXSUPPRESS_SIZER_FLAGS_CHECK"] = "1"
 _PTRACKING = queue.Queue()
@@ -584,6 +587,33 @@ class ResetConfig(resetDelay.ResetDelayConfig):
         self.EndModal(0)
 
 
+class NANDControllerConfig(nandControlConfig.NANDControllerConfig):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.base_parent: MainApp = parent
+        
+        self.cPageWidth.Selection = self.base_parent.page_width + 1
+        self.bSkipRegInit.Value = self.base_parent.skip_init
+        self.bSkipGPIOInit.Value = self.base_parent.skip_gpio_init
+        
+        self.tCustomCFG1.Value = f"{self.base_parent.custom_cfg1:02x}"
+        self.tCustomCFG2.Value = f"{self.base_parent.custom_cfg2:02x}"
+        self.tCustomCFGCMN.Value = f"{self.base_parent.custom_cfg_common:02x}"
+        
+    def doApply(self, event):
+        self.base_parent.page_width = self.cPageWidth.Selection - 1
+        self.base_parent.skip_init = self.bSkipRegInit.Value
+        self.base_parent.skip_gpio_init = self.bSkipGPIOInit.Value
+        
+        self.base_parent.custom_cfg1 = int(self.tCustomCFG1.Value, 16)
+        self.base_parent.custom_cfg2 = int(self.tCustomCFG2.Value, 16)
+        self.base_parent.custom_cfg_common = int(self.tCustomCFGCMN.Value, 16)
+        self.EndModal(0)
+        
+    def doCancel(self, event):
+        self.EndModal(0)
+
+
 class MainApp(main.main):
     def __init__(self, parent):
         global _PTRACKCOUNT
@@ -727,6 +757,15 @@ class MainApp(main.main):
 
         self.reset_delay = 100
 
+        self.page_width = -1
+
+        self.skip_init = False
+        self.skip_gpio_init = True
+        self.custom_cfg1 = -1
+        self.custom_cfg2 = -1
+        self.custom_cfg_common = -1
+
+
         self._nand_idcodes = json.load(
             open(os.path.join(os.path.dirname(__file__), "nand_ids.json"), "r"))
 
@@ -799,6 +838,13 @@ class MainApp(main.main):
 
             _PTRACKCOUNT = cfg["tracking_count"]
             self._debug_logs = cfg["debug_log"]
+            
+            self.skip_init = cfg["nand_skip_init"]
+            self.skip_gpio_init = cfg["nand_skip_init_gpio"]
+            self.custom_cfg1 = cfg["nand_custom_cfg1"]
+            self.custom_cfg2 = cfg["nand_custom_cfg2"]
+            self.custom_cfg_common = cfg["nand_custom_cfg_common"]
+            self.page_width = cfg["nand_page_width"]
 
         if not self.tUserID.Value:
             self.tUserID.Value = str(uuid.uuid4())
@@ -870,6 +916,15 @@ class MainApp(main.main):
             cfg["parport_port"] = self.tParPort.Value
 
             cfg["finder_use_mpsse"] = self.bUseMPSSE.Value
+            
+            cfg["nand_skip_init"] = self.skip_init
+            cfg["nand_skip_init_gpio"] = self.skip_gpio_init
+            cfg["nand_custom_cfg1"] = self.custom_cfg1
+            cfg["nand_custom_cfg2"] = self.custom_cfg2
+            cfg["nand_custom_cfg_common"] = self.custom_cfg_common
+            cfg["nand_page_width"] = self.page_width
+            
+            cfg["dcc_used"] = self._loaded_dcc is not None
 
             pAnalyticsThread = threading.Thread(target=doTrackThread, args=(
                 self.tUserID.Value, action, self._ocd_version, cfg), kwargs=kwargs)
@@ -1600,14 +1655,13 @@ class MainApp(main.main):
         self._isRead = True
         self._isReadCanceled = False
 
-        O1N_isDDP = False
-        O1N_Density = 0
-
-        QSC_NAND_CFG1 = 0
+        NANDC = None
 
         self._btnMsgQueue.put(True)
         self._doAnalytics("dump_start", addr_start=cOffset,
                           addr_end=eOffset, is_memory=False)
+
+        selPlat = const._platforms[self.cChipset.Selection]
 
         try:
             if self._loaded_dcc is not None:
@@ -1621,82 +1675,207 @@ class MainApp(main.main):
                     raise Exception("Flash probe failed!")
                 self._ocdSendCommand("flash info 0")
 
-            elif const._platforms[self.cChipset.Selection]["mode"] in [1, 2]:
-                self.cmd_write_u32(
-                    int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 7)
-                _msleep(const._jtag_init_delay)
+            elif selPlat["mode"] == 1:
+                NANDC = qcom_nandregs.MSM6250NANDController(self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u8, None,
+                                                            selPlat["flash_regs"], nand_int_clr_addr=selPlat["flash_int_clear"], nand_int_addr=selPlat["flash_int"], nand_op_reset_flag=selPlat["flash_nand_int"])
+                assert NANDC._idcode not in [
+                    0x0, 0xffffffff], "NAND detect failed"
 
-                if self.bECCDisable.Value:
-                    self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg"], 16), self.cmd_read_u32(
-                        int(const._platforms[self.cChipset.Selection]["flash_cfg"], 16)) | 1)
+                MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
+                DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
+
+                if self.page_width == -1:
+                    if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                        NANDC._page_width = int(
+                            self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"])
+                else:
+                    NANDC._page_width = self.page_width
+
+                if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
+                    self._logThreadQueue.push(
+                        f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
 
                 else:
-                    self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg"], 16), self.cmd_read_u32(
-                        int(const._platforms[self.cChipset.Selection]["flash_cfg"], 16)) & 0xfffffffe)
+                    self._logThreadQueue.push(
+                        f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
 
-            elif const._platforms[self.cChipset.Selection]["mode"] == 3:
-                self.cmd_write_u32(
-                    int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 0x31)
-                self.cmd_write_u32(
-                    int(const._platforms[self.cChipset.Selection]["flash_exec_cmd"], 16), 1)
-                _msleep(const._jtag_init_delay)
+                if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                    NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
 
-                self.cmd_write_u32(
-                    int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 0xD)
-                self.cmd_write_u32(
-                    int(const._platforms[self.cChipset.Selection]["flash_exec_cmd"], 16), 1)
-                _msleep(const._jtag_init_delay)
+                    self._logThreadQueue.push(f'Page size: {NAND_INFO["page_size"]}')
+                    self._logThreadQueue.push(f'Spare size: {NAND_INFO["spare_size"]}')
+                    self._logThreadQueue.push(f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
+                    self._logThreadQueue.push(f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')                    
 
-                if self.bECCDisable.Value:
-                    self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16), self.cmd_read_u32(
-                        int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16)) | 1)
+
+                    assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
+                        "flash_size"], "Flash address is out of range"
+
+            elif selPlat["mode"] == 2:
+                NANDC = qcom_nandregs.MSM6800NANDController(self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u8, None,
+                                                            selPlat["flash_regs"], nand_int_clr_addr=selPlat["flash_int_clear"], nand_int_addr=selPlat["flash_int"], nand_op_reset_flag=selPlat["flash_nand_int"], page_size=(-1 if self.cNandSize.Selection == 2 else self.cNandSize.Selection))
+                assert NANDC._idcode not in [
+                    0x0, 0xffffffff], "NAND detect failed"
+
+                MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
+                DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
+
+                if self.page_width == -1:
+                    if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                        NANDC._page_width = int(
+                            self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"])
+                else:
+                    NANDC._page_width = self.page_width
+
+                if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
+                    self._logThreadQueue.push(
+                        f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
 
                 else:
-                    self.cmd_write_u32(int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16), self.cmd_read_u32(
-                        int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16)) & 0xfffffffe)
+                    self._logThreadQueue.push(
+                        f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
 
-                _msleep(const._jtag_init_delay)
-                QSC_NAND_CFG1 = self.cmd_read_u32(
-                    int(const._platforms[self.cChipset.Selection]["flash_cfg1"], 16))
+                if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                    NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
 
-            elif const._platforms[self.cChipset.Selection]["mode"] == 4:
+                    self._logThreadQueue.push(f'Page size: {NAND_INFO["page_size"]}')
+                    self._logThreadQueue.push(f'Spare size: {NAND_INFO["spare_size"]}')
+                    self._logThreadQueue.push(f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
+                    self._logThreadQueue.push(f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
+                    self._logThreadQueue.push(f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}')
+
+
+                    assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
+                        "flash_size"], "Flash address is out of range"
+
+            elif selPlat["mode"] == 3:
+                NANDC = qcom_nandregs.MSM7200NANDController(
+                    self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u8, None, selPlat["flash_regs"], bb_in_data=self.bBadBlockinData.Value, page_size=(-1 if self.cNandSize.Selection == 2 else self.cNandSize.Selection))
+                assert NANDC._idcode not in [
+                    0x0, 0xffffffff], "NAND detect failed"
+
+                MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
+                DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
+
+                if self.page_width == -1:
+                    if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                        NANDC._page_width = int(
+                            self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"])
+                else:
+                    NANDC._page_width = self.page_width
+
+                if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
+                    self._logThreadQueue.push(
+                        f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
+
+                else:
+                    self._logThreadQueue.push(
+                        f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
+
+                if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                    NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
+
+                    self._logThreadQueue.push(f'Page size: {NAND_INFO["page_size"]}')
+                    self._logThreadQueue.push(f'Spare size: {NAND_INFO["spare_size"]}')
+                    self._logThreadQueue.push(f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
+                    self._logThreadQueue.push(f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
+                    self._logThreadQueue.push(f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}')
+
+
+                    assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
+                        "flash_size"], "Flash address is out of range"
+
+            elif selPlat["mode"] == 4:
                 assert cOffset >= self._cfi_start_offset, f"Read address must be greater or equal than {hex(self._cfi_start_offset)}"
 
                 if not self._ocdSendCommand("flash probe 0").startswith("flash 'cfi' found at"):
                     raise Exception("Flash probe failed!")
                 self._ocdSendCommand("flash info 0")
 
-            elif const._platforms[self.cChipset.Selection]["mode"] == -1:
+            elif selPlat["mode"] == -1:
                 assert cOffset >= self._cfi_start_offset, f"Read address must be greater or equal than {hex(self._cfi_start_offset)}"
 
                 self._ocdSendCommand("flash probe 0")
                 self._ocdSendCommand("flash info 0")
 
-            elif const._platforms[self.cChipset.Selection]["mode"] == 5:
-                if const._platforms[self.cChipset.Selection]["reg_width"] in [0, 1]:
-                    self.cmd_write_u8(
-                        const._platforms[self.cChipset.Selection]["flash_cmd"], 0xff)
+            elif selPlat["mode"] == 5:
+                if selPlat["mode"]["reg_width"] == 0:
+                    NANDC = common_nandregs.GenericNANDController(self.cmd_write_u8, self.cmd_read_u8, self.cmd_write_u8, "big" if self.cTarget.Selection >= self._beTarget else "little",
+                                                                  self.cmd_read_u32, selPlat["flash_cmd"], selPlat["flash_addr"], selPlat["flash_buffer"], selPlat["flash_wait"], selPlat["wait_mask"], (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), 0)
 
-                elif const._platforms[self.cChipset.Selection]["reg_width"] == 2:
-                    self.cmd_write_u16(
-                        const._platforms[self.cChipset.Selection]["flash_cmd"], 0xff)
+                elif selPlat["mode"]["reg_width"] == 1:
+                    NANDC = common_nandregs.GenericNANDController(self.cmd_write_u8, self.cmd_read_u16, self.cmd_write_u16, "big" if self.cTarget.Selection >= self._beTarget else "little",
+                                                                  self.cmd_read_u32, selPlat["flash_cmd"], selPlat["flash_addr"], selPlat["flash_buffer"], selPlat["flash_wait"], selPlat["wait_mask"], (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), 1)
 
-                elif const._platforms[self.cChipset.Selection]["reg_width"] == 4:
-                    self.cmd_write_u32(
-                        const._platforms[self.cChipset.Selection]["flash_cmd"], 0xff)
+                elif selPlat["mode"]["reg_width"] == 2:
+                    NANDC = common_nandregs.GenericNANDController(self.cmd_write_u16, self.cmd_read_u16, self.cmd_write_u16, "big" if self.cTarget.Selection >= self._beTarget else "little",
+                                                                  self.cmd_read_u32, selPlat["flash_cmd"], selPlat["flash_addr"], selPlat["flash_buffer"], selPlat["flash_wait"], selPlat["wait_mask"], (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), 0)
+
+                elif selPlat["mode"]["reg_width"] == 4:
+                    NANDC = common_nandregs.GenericNANDController(self.cmd_write_u32, self.cmd_read_u32, self.cmd_write_u32, "big" if self.cTarget.Selection >= self._beTarget else "little",
+                                                                  self.cmd_read_u32, selPlat["flash_cmd"], selPlat["flash_addr"], selPlat["flash_buffer"], selPlat["flash_wait"], selPlat["wait_mask"], (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), 0)
 
                 _msleep(const._jtag_init_delay)
 
-            elif const._platforms[self.cChipset.Selection]["mode"] == 7:
-                O1N_BASE = int(const._platforms[self.cChipset.Selection]["o1n_offset"],
-                               16) if "o1n_offset" in const._platforms[self.cChipset.Selection] else baseO1N
-                print("start dumping O1N from", hex(O1N_BASE))
+                assert NANDC._idcode not in [
+                    0x0, 0xffffffff], "NAND detect failed"
 
-                O1N_DevID = self.cmd_read_u16(O1N_BASE + 0x1E002)
+                MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
+                DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
 
-                O1N_isDDP = bool(O1N_DevID & 8)
-                O1N_Density = 2 << (
-                    (5 if O1N_isDDP else 6) + ((O1N_DevID >> 4) & 0xf))
+                if self.page_width == -1:
+                    if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                        NANDC._page_width = int(
+                            self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"])
+                else:
+                    NANDC._page_width = self.page_width
+                    
+                if self.cNandSize.Selection == 2:
+                    if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                        NANDC._page_size = int(
+                            self._nand_idcodes["devids"][DEV_ID_HEX]["is_extended"])
+
+                if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
+                    self._logThreadQueue.push(
+                        f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
+
+                else:
+                    self._logThreadQueue.push(
+                        f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
+
+                if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                    NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
+
+                    self._logThreadQueue.push(f'Page size: {NAND_INFO["page_size"]}')
+                    self._logThreadQueue.push(f'Spare size: {NAND_INFO["spare_size"]}')
+                    self._logThreadQueue.push(f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
+                    self._logThreadQueue.push(f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
+                    self._logThreadQueue.push(f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}')
+
+                    assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
+                        "flash_size"], "Flash address is out of range"
+
+            elif selPlat["mode"] == 7:
+                NANDC = common_nandregs.OneNANDController(self.cmd_read_u16, self.cmd_write_u16, self.cmd_read_u8,
+                                                          self.cmd_write_u8, selPlat["o1n_offset"] if "o1n_offset" in selPlat else baseO1N, (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection))
+
+                assert NANDC._idcode not in [
+                    0x0, 0xffffffff], "NAND detect failed"
+
+                MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
+
+                if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
+                    self._logThreadQueue.push(
+                        f'Found OneNAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
+
+                else:
+                    self._logThreadQueue.push(
+                        f'Found OneNAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
+
+                self._logThreadQueue.push(f"Flash size: {NANDC._density >> 3}MB")
+
+                assert cOffset < (NANDC._density << 17) and eOffset < (
+                    NANDC._density << 17), "Flash address is out of range"
 
             time.sleep(1)
             self._logSupressed = True
@@ -1705,336 +1884,24 @@ class MainApp(main.main):
 
             with open(name, "wb") as tempFile:
                 while cOffset < eOffset and not self._isReadCanceled:
-                    if self._loaded_dcc is not None or const._platforms[self.cChipset.Selection]["mode"] in [-1, 4]:
+                    if self._loaded_dcc is not None or selPlat["mode"] in [-1, 4]:
                         tempFile.write(self.cmd_read_flash(
                             cOffset - self._cfi_start_offset, 0x200))
                         cOffset += 0x200
 
-                    elif const._platforms[self.cChipset.Selection]["mode"] == 1:
-                        self.cmd_write_u32(
-                            int(const._platforms[self.cChipset.Selection]["flash_addr"], 16), cOffset)
-
-                        for _ in range(4 if self.cNandSize.Selection == 1 else 1):
-                            self.cmd_write_u32(
-                                int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 1)
-
-                            for _ in range(0x2500):
-                                _msleep(const._jtag_sleep_delay)
-                                if self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_wait_status"], 16)) & 8192:
-                                    break
-
-                            tempFile.write(self.cmd_read_u8(
-                                int(const._platforms[self.cChipset.Selection]["flash_buffer"], 16), 0x200))
-
-                            spareBuf += self.cmd_read_u8(
-                                int(const._platforms[self.cChipset.Selection]["flash_buffer"], 16) + 0x200, 0x10)
-
-                            cOffset += 0x200
-                            if cOffset >= eOffset:
-                                break
-
-                    elif const._platforms[self.cChipset.Selection]["mode"] == 2:
-                        self.cmd_write_u32(
-                            int(const._platforms[self.cChipset.Selection]["flash_addr"], 16), cOffset >> 2 if self.cNandSize.Selection == 1 else cOffset)
-
-                        for _ in range(4 if self.cNandSize.Selection == 1 else 1):
-                            self.cmd_write_u32(
-                                int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 1)
-
-                            for _ in range(0x2500):
-                                _msleep(const._jtag_sleep_delay)
-                                if self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_wait_status"], 16)) & 2:
-                                    break
-
-                            tempFile.write(self.cmd_read_u8(
-                                int(const._platforms[self.cChipset.Selection]["flash_buffer"], 16), 0x200))
-
-                            spareBuf += self.cmd_read_u8(
-                                int(const._platforms[self.cChipset.Selection]["flash_buffer"], 16) + 0x200, 0x10)
-
-                            cOffset += 0x200
-                            if cOffset >= eOffset:
-                                break
-
-                    elif const._platforms[self.cChipset.Selection]["mode"] == 3:
-                        self.cmd_write_u32(
-                            int(const._platforms[self.cChipset.Selection]["flash_cmd"], 16), 0x34)
-
-                        flash_write = ((cOffset >> 11) << 16) | (((cOffset >> 1) & 0x3ff) if QSC_NAND_CFG1 & 2 else (
-                            cOffset & 0x7ff)) if self.cNandSize.Selection == 1 else ((cOffset >> 9) << 8) | ((cOffset >> 1) & 0xff)
-
-                        self.cmd_write_u32(int(
-                            const._platforms[self.cChipset.Selection]["flash_addr0"], 16), flash_write & 0xffffffff)
-                        self.cmd_write_u32(int(
-                            const._platforms[self.cChipset.Selection]["flash_addr1"], 16), (flash_write >> 32) & 0xffffffff)
-
-                        for _ in range(4 if self.cNandSize.Selection == 1 else 1):
-                            self.cmd_write_u32(
-                                int(const._platforms[self.cChipset.Selection]["flash_exec_cmd"], 16), 1)
-
-                            for _ in range(0x2500):
-                                _msleep(const._jtag_sleep_delay)
-                                if (self.cmd_read_u32(int(const._platforms[self.cChipset.Selection]["flash_status"], 16)) & 0xf) == 0:
-                                    break
-
-                            tempChunk = self.cmd_read_u8(
-                                int(const._platforms[self.cChipset.Selection]["flash_buffer"], 16), 0x210)
-
-                            if self.bBadBlockinData:
-                                tempFile.write(
-                                    tempChunk[:0x1d0] + tempChunk[0x1d2:0x202])
-                                spareBuf += tempChunk[0x202:] + b"\xff\xff"
-                                bbBuf += tempChunk[0x1d0:0x1d2]
-
-                            else:
-                                tempFile.write(tempChunk[:0x200])
-                                spareBuf += tempChunk[0x200:]
-
-                            cOffset += 0x200
-                            if cOffset >= eOffset:
-                                break
-
-                    elif const._platforms[self.cChipset.Selection]["mode"] == 5:
-                        if const._platforms[self.cChipset.Selection]["reg_width"] == 0:
-                            if self.cNandSize.Selection == 1:
-                                self.cmd_write_u8(
-                                    const._platforms[self.cChipset.Selection]["flash_cmd"], 0x00)
-
-                                self.cmd_write_u8(
-                                    const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
-                                self.cmd_write_u8(
-                                    const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 8) & 0xf)
-
-                                self.cmd_write_u8(
-                                    const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 11) & 0xff)
-                                self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((
-                                    cOffset >> 11) >> 8) & 0xff)
-                                self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((
-                                    cOffset >> 11) >> 16) & 0xff)
-
-                                self.cmd_write_u8(
-                                    const._platforms[self.cChipset.Selection]["flash_cmd"], 0x30)
-
-                            else:
-                                self.cmd_write_u8(
-                                    const._platforms[self.cChipset.Selection]["flash_cmd"], (cOffset >> 8) & 1)
-
-                                self.cmd_write_u8(
-                                    const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
-
-                                self.cmd_write_u8(
-                                    const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 9) & 0xff)
-                                self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((
-                                    cOffset >> 9) >> 8) & 0xff)
-                                self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((
-                                    cOffset >> 9) >> 16) & 0xff)
-
-                            for _ in range(0x2500):
-                                _msleep(const._jtag_sleep_delay)
-                                if const._platforms[self.cChipset.Selection]["wait_mask"] is not None:
-                                    if self.cmd_read_u32(const._platforms[self.cChipset.Selection]["flash_wait"]) & const._platforms[self.cChipset.Selection]["wait_mask"]:
-                                        break
-
-                            temp_buf = []
-                            for _ in range(0x800 if self.cNandSize.Selection == 1 else 0x200):
-                                temp_buf.append(self.cmd_read_u8(
-                                    const._platforms[self.cChipset.Selection]["flash_buffer"]))
-                                cOffset += 1
-
-                                if cOffset >= eOffset:
-                                    break
-
-                            tempFile.write(bytes(temp_buf))
-                            if cOffset >= eOffset:
-                                break
-
-                        elif const._platforms[self.cChipset.Selection]["reg_width"] == 1:
-                            self.cmd_write_u8(
-                                const._platforms[self.cChipset.Selection]["flash_cmd"], 0)
-
-                            self.cmd_write_u8(
-                                const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 1) & 0xff)
-
-                            self.cmd_write_u8(
-                                const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 9) & 0xff)
-                            self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((
-                                cOffset >> 9) >> 8) & 0xff)
-                            self.cmd_write_u8(const._platforms[self.cChipset.Selection]["flash_addr"], ((
-                                cOffset >> 9) >> 16) & 0xff)
-
-                            for _ in range(0x2500):
-                                _msleep(const._jtag_sleep_delay)
-                                if const._platforms[self.cChipset.Selection]["wait_mask"] is not None:
-                                    if self.cmd_read_u32(const._platforms[self.cChipset.Selection]["flash_wait"]) & const._platforms[self.cChipset.Selection]["wait_mask"]:
-                                        break
-
-                            temp_buf = []
-                            for _ in range(0x400 if self.cNandSize.Selection == 1 else 0x100):
-                                temp_buf.append(self.cmd_read_u16(
-                                    const._platforms[self.cChipset.Selection]["flash_buffer"]))
-                                cOffset += 2
-
-                                if cOffset >= eOffset:
-                                    break
-
-                            tempFile.write(b"".join([x.to_bytes(
-                                2, "big" if self.cTarget.Selection >= self._beTarget else "little") for x in temp_buf]))
-                            if cOffset >= eOffset:
-                                break
-
-                        elif const._platforms[self.cChipset.Selection]["reg_width"] == 2:
-                            if self.cNandSize.Selection == 1:
-                                self.cmd_write_u16(
-                                    const._platforms[self.cChipset.Selection]["flash_cmd"], 0x00)
-
-                                self.cmd_write_u16(
-                                    const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
-                                self.cmd_write_u16(
-                                    const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 8) & 0xf)
-
-                                self.cmd_write_u16(
-                                    const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 11) & 0xff)
-                                self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], ((
-                                    cOffset >> 11) >> 8) & 0xff)
-                                self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], ((
-                                    cOffset >> 11) >> 16) & 0xff)
-
-                                self.cmd_write_u16(
-                                    const._platforms[self.cChipset.Selection]["flash_cmd"], 0x30)
-
-                            else:
-                                self.cmd_write_u16(
-                                    const._platforms[self.cChipset.Selection]["flash_cmd"], (cOffset >> 8) & 1)
-
-                                self.cmd_write_u16(
-                                    const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
-
-                                self.cmd_write_u16(
-                                    const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 9) & 0xff)
-                                self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], ((
-                                    cOffset >> 9) >> 8) & 0xff)
-                                self.cmd_write_u16(const._platforms[self.cChipset.Selection]["flash_addr"], ((
-                                    cOffset >> 9) >> 16) & 0xff)
-
-                            for _ in range(0x2500):
-                                _msleep(const._jtag_sleep_delay)
-                                if const._platforms[self.cChipset.Selection]["wait_mask"] is not None:
-                                    if self.cmd_read_u32(const._platforms[self.cChipset.Selection]["flash_wait"]) & const._platforms[self.cChipset.Selection]["wait_mask"]:
-                                        break
-
-                            temp_buf = []
-                            for _ in range(0x400 if self.cNandSize.Selection == 1 else 0x100):
-                                temp_buf.append(self.cmd_read_u16(
-                                    const._platforms[self.cChipset.Selection]["flash_buffer"]))
-                                cOffset += 2
-
-                                if cOffset >= eOffset:
-                                    break
-
-                            tempFile.write(b"".join([x.to_bytes(
-                                2, "big" if self.cTarget.Selection >= self._beTarget else "little") for x in temp_buf]))
-                            if cOffset >= eOffset:
-                                break
-
-                        elif const._platforms[self.cChipset.Selection]["reg_width"] == 4:
-                            if self.cNandSize.Selection == 1:
-                                self.cmd_write_u32(
-                                    const._platforms[self.cChipset.Selection]["flash_cmd"], 0x00)
-
-                                self.cmd_write_u32(
-                                    const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
-                                self.cmd_write_u32(
-                                    const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 8) & 0xf)
-
-                                self.cmd_write_u32(
-                                    const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 11) & 0xff)
-                                self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], ((
-                                    cOffset >> 11) >> 8) & 0xff)
-                                self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], ((
-                                    cOffset >> 11) >> 16) & 0xff)
-
-                                self.cmd_write_u32(
-                                    const._platforms[self.cChipset.Selection]["flash_cmd"], 0x30)
-
-                            else:
-                                self.cmd_write_u32(
-                                    const._platforms[self.cChipset.Selection]["flash_cmd"], (cOffset >> 8) & 1)
-
-                                self.cmd_write_u32(
-                                    const._platforms[self.cChipset.Selection]["flash_addr"], cOffset & 0xff)
-
-                                self.cmd_write_u32(
-                                    const._platforms[self.cChipset.Selection]["flash_addr"], (cOffset >> 9) & 0xff)
-                                self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], ((
-                                    cOffset >> 9) >> 8) & 0xff)
-                                self.cmd_write_u32(const._platforms[self.cChipset.Selection]["flash_addr"], ((
-                                    cOffset >> 9) >> 16) & 0xff)
-
-                            for _ in range(0x2500):
-                                _msleep(const._jtag_sleep_delay)
-                                if const._platforms[self.cChipset.Selection]["wait_mask"] is not None:
-                                    if self.cmd_read_u32(const._platforms[self.cChipset.Selection]["flash_wait"]) & const._platforms[self.cChipset.Selection]["wait_mask"]:
-                                        break
-
-                            temp_buf = []
-                            for _ in range(0x400 if self.cNandSize.Selection == 1 else 0x100):
-                                temp_buf.append(self.cmd_read_u32(
-                                    const._platforms[self.cChipset.Selection]["flash_buffer"]))
-                                cOffset += 2
-
-                                if cOffset >= eOffset:
-                                    break
-
-                            tempFile.write(b"".join([x.to_bytes(
-                                2, "big" if self.cTarget.Selection >= self._beTarget else "little") for x in temp_buf]))
-                            if cOffset >= eOffset:
-                                break
-
-                    elif const._platforms[self.cChipset.Selection]["mode"] == 6:
-                        raise NotImplementedError()
-
-                    elif const._platforms[self.cChipset.Selection]["mode"] == 7:
-                        O1N_BASE = int(const._platforms[self.cChipset.Selection]["o1n_offset"],
-                                       16) if "o1n_offset" in const._platforms[self.cChipset.Selection] else baseO1N
-
-                        self.cmd_write_u16(
-                            O1N_BASE + 0x1E202, 0x8000 if O1N_isDDP and (cOffset >> 17) >= O1N_Density else 0x0)
-                        self.cmd_write_u16(O1N_BASE + 0x1E200, (0x8000 if O1N_isDDP and (
-                            cOffset >> 17) >= O1N_Density else 0x0) | ((cOffset >> 17) & (O1N_Density - 1)))
-                        self.cmd_write_u16(
-                            O1N_BASE + 0x1E20E, (cOffset >> 9) & 0xff)
-
-                        self.cmd_write_u16(O1N_BASE + 0x1E400, 0x800)
-
-                        if self.bECCDisable.Value:
-                            self.cmd_write_u16(
-                                O1N_BASE + 0x1E442, self.cmd_read_u16(O1N_BASE + 0x1E442) | (1 << 8))
-
-                        else:
-                            self.cmd_write_u16(
-                                O1N_BASE + 0x1E442, self.cmd_read_u16(O1N_BASE + 0x1E442) & 0xfeff)
-
-                        self.cmd_write_u16(O1N_BASE + 0x1E482, 0)
-                        self.cmd_write_u16(O1N_BASE + 0x1E440, 0)
-
-                        for _ in range(0x2500):
-                            _msleep(const._jtag_sleep_delay)
-                            if self.cmd_read_u16(O1N_BASE + 0x1E482) & 0x8000:
-                                break
-
-                        for x in range(8 if self.cNandSize.Selection == 1 else 4):
-                            tempFile.write(self.cmd_read_u8(
-                                O1N_BASE + 0x400 + (0x200 * x), 0x200))
-                            spareBuf += self.cmd_read_u8(O1N_BASE +
-                                                         0x10020 + (0x10 * x), 0x10)
-
-                            cOffset += 0x200
-                            if cOffset >= eOffset:
-                                break
+                    elif NANDC is not None:
+                        data, spare, bbm = NANDC.read(cOffset >> ((11 if self.cNandSize.Selection == 1 else 9) if selPlat["mode"] != 7 else (
+                            12 if self.cNandSize.Selection == 1 else 11)))
+
+                        tempFile.write(data)
+                        spareBuf += spare
+                        bbBuf += bbm
+
+                        cOffset += (0x800 if self.cNandSize.Selection == 1 else 0x200) if selPlat["mode"] != 7 else (
+                            0x1000 if self.cNandSize.Selection == 1 else 0x800)
 
                     else:
-                        raise Exception(
-                            "The read flash code should not reach there")
+                        raise NotImplementedError()
 
                     self._progMsgQueue.put(cOffset/eOffset)
 
@@ -2407,9 +2274,16 @@ class MainApp(main.main):
             cfg["user_id"] = self.tUserID.Value
 
             cfg["tracking_count"] = _PTRACKCOUNT
-            cfg["debug_log"] = self._debug_logs
-
-            cfg["dcc_used"] = self._loaded_dcc is not None
+            cfg["debug_log"] = self._debug_logs            
+            
+            cfg["nand_skip_init"] = self.skip_init
+            cfg["nand_skip_init_gpio"] = self.skip_gpio_init
+            cfg["nand_custom_cfg1"] = self.custom_cfg1
+            cfg["nand_custom_cfg2"] = self.custom_cfg2
+            cfg["nand_custom_cfg_common"] = self.custom_cfg_common
+            cfg["nand_page_width"] = self.page_width
+            
+            cfg["last_updated"] = int(datetime.datetime.today().timestamp())
 
             json.dump(cfg, open(os.path.join(os.path.dirname(
                 __file__), "dumpit_config.json"), "w"), indent=4)
@@ -2439,6 +2313,9 @@ class MainApp(main.main):
 
     def bDoConfigureReset(self, event):
         ResetConfig(self).ShowModal()
+
+    def doNANDConfigure(self, event):
+        NANDControllerConfig(self).ShowModal()
 
 
 def getInitCmd(self: MainApp):
@@ -2519,7 +2396,15 @@ if __name__ == "__main__":
     requests.packages.urllib3.util.connection.HAS_IPV6 = os.environ.get(
         "DUMPIT_IPV4_ONLY", "0") == "1"
 
-    app = wx.App(True)
+    try:
+        app = wx.App(True)     
+           
+    except SystemExit as e:
+        if isinstance(e.code, str):
+            print("wxWidgets has failed to initialize:")
+        
+        raise
+
     m = MainApp(None)
     m.Show()
     app.MainLoop()

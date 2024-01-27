@@ -157,9 +157,9 @@ class main ( wx.Frame ):
 
 		bSizer6111.Add( self.lNandSize, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
-		cNandSizeChoices = [ u"512/2K (O1N)", u"2K/4K (O1N)" ]
+		cNandSizeChoices = [ u"512/2K (O1N)", u"2K/4K (O1N)", u"Auto" ]
 		self.cNandSize = wx.Choice( self.dPage1, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, cNandSizeChoices, 0 )
-		self.cNandSize.SetSelection( 0 )
+		self.cNandSize.SetSelection( 2 )
 		bSizer6111.Add( self.cNandSize, 1, wx.ALL, 5 )
 
 		self.bECCDisable = wx.CheckBox( self.dPage1, wx.ID_ANY, u"Disable ECC", wx.DefaultPosition, wx.DefaultSize, 0 )
@@ -217,7 +217,10 @@ class main ( wx.Frame ):
 		self.bStop = wx.Button( self.dPage1, wx.ID_ANY, u"Stop", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.bStop.Enable( False )
 
-		bSizer61111.Add( self.bStop, 1, wx.ALL, 5 )
+		bSizer61111.Add( self.bStop, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+		self.bNandConfigure = wx.Button( self.dPage1, wx.ID_ANY, u"Configure NAND Controller", wx.DefaultPosition, wx.DefaultSize, 0 )
+		bSizer61111.Add( self.bNandConfigure, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 
 		bSizer5.Add( bSizer61111, 0, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL, 5 )
@@ -625,6 +628,7 @@ class main ( wx.Frame ):
 		self.bDumpFlash.Bind( wx.EVT_BUTTON, self.doReadFlash )
 		self.bDumpMemory.Bind( wx.EVT_BUTTON, self.doReadMemory )
 		self.bStop.Bind( wx.EVT_BUTTON, self.doStop )
+		self.bNandConfigure.Bind( wx.EVT_BUTTON, self.doNANDConfigure )
 		self.bGo.Bind( wx.EVT_BUTTON, self.doGo )
 		self.bHalt.Bind( wx.EVT_BUTTON, self.doHalt )
 		self.bReset.Bind( wx.EVT_BUTTON, self.doReset )
@@ -684,6 +688,9 @@ class main ( wx.Frame ):
 		event.Skip()
 
 	def doStop( self, event ):
+		event.Skip()
+
+	def doNANDConfigure( self, event ):
 		event.Skip()
 
 	def doGo( self, event ):
