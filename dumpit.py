@@ -1715,7 +1715,7 @@ class MainApp(main.main):
                 NANDC = qcom_nandregs.MSM6800NANDController(self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u8, None,
                                                             selPlat["flash_regs"], nand_int_clr_addr=selPlat["flash_int_clear"], nand_int_addr=selPlat["flash_int"], nand_op_reset_flag=selPlat["flash_nand_int"], page_size=(-1 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), page_width=self.page_width)
                 assert NANDC._idcode not in [
-                    0x0, 0xffffffff], "NAND detect failed"
+                    0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
 
                 MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
                 DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'                
@@ -1745,7 +1745,7 @@ class MainApp(main.main):
                 NANDC = qcom_nandregs.MSM7200NANDController(
                     self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u8, None, selPlat["flash_regs"], bb_in_data=self.bBadBlockinData.Value, page_size=(-1 if self.cNandSize.Selection == 2 else self.cNandSize.Selection))
                 assert NANDC._idcode not in [
-                    0x0, 0xffffffff], "NAND detect failed"
+                    0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
 
                 MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
                 DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
@@ -1811,7 +1811,7 @@ class MainApp(main.main):
                 _msleep(const._jtag_init_delay)
 
                 assert NANDC._idcode not in [
-                    0x0, 0xffffffff], "NAND detect failed"
+                    0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
 
                 MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
                 DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
@@ -1853,7 +1853,7 @@ class MainApp(main.main):
                                                           self.cmd_write_u8, selPlat["o1n_offset"] if "o1n_offset" in selPlat else baseO1N, (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection))
 
                 assert NANDC._idcode not in [
-                    0x0, 0xffffffff], "NAND detect failed"
+                    0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
 
                 MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
 
