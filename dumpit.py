@@ -765,6 +765,7 @@ class MainApp(main.main):
         self.custom_cfg2 = -1
         self.custom_cfg_common = -1
 
+        self._isInitDone = False        
 
         self._nand_idcodes = json.load(
             open(os.path.join(os.path.dirname(__file__), "nand_ids.json"), "r"))
@@ -955,6 +956,15 @@ class MainApp(main.main):
                     if p[0] == "data":
                         self._sioMsgQueue.put(p[1])
 
+                    elif p[0] == "command":                        
+                        if p[1]["c"] == "initDone":
+                            if self._debug_logs: print("init done received")
+                            self._isInitDone = True
+
+                        elif p[1]["c"] == "initUndone":
+                            if self._debug_logs: print("init undone received")
+                            self._isInitDone = False
+
                     elif p[0] == "log" and not self._logSupressed:
                         self._logThreadQueue.put(p[1])
 
@@ -994,7 +1004,13 @@ class MainApp(main.main):
                         self._sio.emit("data", self._ocdSendCommand(p[1]))
 
                     elif p[0] == "command":
-                        pass
+                        if p[1]["c"] == "initDone":
+                            if self._debug_logs: print("init done received")
+                            self._isInitDone = True
+
+                        elif p[1]["c"] == "initUndone":
+                            if self._debug_logs: print("init undone received")
+                            self._isInitDone = False
 
                     elif p[0] == "bye":
                         # print("bye event")
@@ -1206,6 +1222,8 @@ class MainApp(main.main):
             self._doAnalytics("disconnect", reason=0)
 
         else:
+            self._isInitDone = False
+
             if self._ocd and self._ocd.poll() is None:
                 self._ocd.kill()
             gc.collect()
@@ -1305,6 +1323,7 @@ class MainApp(main.main):
                     self._sioThread.join(15)
             except Exception:
                 pass
+            self._isInitDone = False
 
             self._sio = socketio.SimpleClient(
                 handle_sigint=False, reconnection_delay=0.5, reconnection_delay_max=0.5)
@@ -1390,6 +1409,7 @@ class MainApp(main.main):
                     self._sioThread.join(15)
             except Exception:
                 pass
+            self._isInitDone = False
 
             self._sio = socketio.SimpleClient(
                 handle_sigint=False, reconnection_delay=0.5, reconnection_delay_max=0.5)
@@ -1664,211 +1684,216 @@ class MainApp(main.main):
         selPlat = const._platforms[self.cChipset.Selection]
 
         try:
-            if self._loaded_dcc is not None:
-                self._ocdSendCommand("soft_reset_halt")
-                self._ocdSendCommand(f"load_image $_DCC_PATH", False)
-                self._ocdSendCommand("arm core_state arm")
-                self._ocdSendCommand(
-                    f"resume $_DCC_START_OFFSET")
+            if not self._isInitDone:
+                if self._loaded_dcc is not None:
+                    self._ocdSendCommand("soft_reset_halt")
+                    self._ocdSendCommand(f"load_image $_DCC_PATH", False)
+                    self._ocdSendCommand("arm core_state arm")
+                    self._ocdSendCommand(
+                        f"resume $_DCC_START_OFFSET")
 
-                if not self._ocdSendCommand("flash probe 0").startswith("flash 'ocl' found at"):
-                    raise Exception("Flash probe failed!")
-                self._ocdSendCommand("flash info 0")
+                    if not self._ocdSendCommand("flash probe 0").startswith("flash 'ocl' found at"):
+                        raise Exception("Flash probe failed!")
+                    self._ocdSendCommand("flash info 0")
 
-            elif selPlat["mode"] == 1:
-                NANDC = qcom_nandregs.MSM6250NANDController(self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u8, None,
-                                                            selPlat["flash_regs"], nand_int_clr_addr=selPlat["flash_int_clear"], nand_int_addr=selPlat["flash_int"], nand_op_reset_flag=selPlat["flash_nand_int"])
-                assert NANDC._idcode not in [
-                    0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
+                elif selPlat["mode"] == 1:
+                    NANDC = qcom_nandregs.MSM6250NANDController(self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u8, None,
+                                                                selPlat["flash_regs"], nand_int_clr_addr=selPlat["flash_int_clear"], nand_int_addr=selPlat["flash_int"], nand_op_reset_flag=selPlat["flash_nand_int"])
+                    assert NANDC._idcode not in [
+                        0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
 
-                MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
-                DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
+                    MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
+                    DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
 
-                if self.page_width == -1:
+                    if self.page_width == -1:
+                        if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                            NANDC._page_width = int(
+                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"])
+                    else:
+                        NANDC._page_width = self.page_width
+
+                    if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
+                        self._logThreadQueue.push(
+                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
+
+                    else:
+                        self._logThreadQueue.push(
+                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
+
                     if DEV_ID_HEX in self._nand_idcodes["devids"]:
-                        NANDC._page_width = int(
-                            self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"])
-                else:
-                    NANDC._page_width = self.page_width
+                        NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
 
-                if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
-                    self._logThreadQueue.push(
-                        f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
-
-                else:
-                    self._logThreadQueue.push(
-                        f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
-
-                if DEV_ID_HEX in self._nand_idcodes["devids"]:
-                    NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
-
-                    self._logThreadQueue.push(f'Page size: {NAND_INFO["page_size"]}')
-                    self._logThreadQueue.push(f'Spare size: {NAND_INFO["spare_size"]}')
-                    self._logThreadQueue.push(f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
-                    self._logThreadQueue.push(f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')                    
+                        self._logThreadQueue.push(f'Page size: {NAND_INFO["page_size"]}')
+                        self._logThreadQueue.push(f'Spare size: {NAND_INFO["spare_size"]}')
+                        self._logThreadQueue.push(f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
+                        self._logThreadQueue.push(f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')                    
 
 
-                    assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
-                        "flash_size"], "Flash address is out of range"
+                        assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
+                            "flash_size"], "Flash address is out of range"
 
-            elif selPlat["mode"] == 2:
-                NANDC = qcom_nandregs.MSM6800NANDController(self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u8, None,
-                                                            selPlat["flash_regs"], nand_int_clr_addr=selPlat["flash_int_clear"], nand_int_addr=selPlat["flash_int"], nand_op_reset_flag=selPlat["flash_nand_int"], page_size=(-1 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), page_width=self.page_width)
-                assert NANDC._idcode not in [
-                    0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
+                elif selPlat["mode"] == 2:
+                    NANDC = qcom_nandregs.MSM6800NANDController(self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u8, None,
+                                                                selPlat["flash_regs"], nand_int_clr_addr=selPlat["flash_int_clear"], nand_int_addr=selPlat["flash_int"], nand_op_reset_flag=selPlat["flash_nand_int"], page_size=(-1 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), page_width=self.page_width)
+                    assert NANDC._idcode not in [
+                        0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
 
-                MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
-                DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'                
+                    MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
+                    DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'                
 
-                if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
-                    self._logThreadQueue.push(
-                        f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
+                    if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
+                        self._logThreadQueue.push(
+                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
 
-                else:
-                    self._logThreadQueue.push(
-                        f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
+                    else:
+                        self._logThreadQueue.push(
+                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
 
-                if DEV_ID_HEX in self._nand_idcodes["devids"]:
-                    NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
-
-                    self._logThreadQueue.push(f'Page size: {NAND_INFO["page_size"]}')
-                    self._logThreadQueue.push(f'Spare size: {NAND_INFO["spare_size"]}')
-                    self._logThreadQueue.push(f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
-                    self._logThreadQueue.push(f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
-                    self._logThreadQueue.push(f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}')
-
-
-                    assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
-                        "flash_size"], "Flash address is out of range"
-
-            elif selPlat["mode"] == 3:
-                NANDC = qcom_nandregs.MSM7200NANDController(
-                    self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u8, None, selPlat["flash_regs"], bb_in_data=self.bBadBlockinData.Value, page_size=(-1 if self.cNandSize.Selection == 2 else self.cNandSize.Selection))
-                assert NANDC._idcode not in [
-                    0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
-
-                MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
-                DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
-
-                if self.page_width == -1:
                     if DEV_ID_HEX in self._nand_idcodes["devids"]:
-                        NANDC._page_width = int(
-                            self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"])
-                else:
-                    NANDC._page_width = self.page_width
+                        NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
 
-                if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
-                    self._logThreadQueue.push(
-                        f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
-
-                else:
-                    self._logThreadQueue.push(
-                        f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
-
-                if DEV_ID_HEX in self._nand_idcodes["devids"]:
-                    NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
-
-                    self._logThreadQueue.push(f'Page size: {NAND_INFO["page_size"]}')
-                    self._logThreadQueue.push(f'Spare size: {NAND_INFO["spare_size"]}')
-                    self._logThreadQueue.push(f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
-                    self._logThreadQueue.push(f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
-                    self._logThreadQueue.push(f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}')
+                        self._logThreadQueue.push(f'Page size: {NAND_INFO["page_size"]}')
+                        self._logThreadQueue.push(f'Spare size: {NAND_INFO["spare_size"]}')
+                        self._logThreadQueue.push(f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
+                        self._logThreadQueue.push(f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
+                        self._logThreadQueue.push(f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}')
 
 
-                    assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
-                        "flash_size"], "Flash address is out of range"
+                        assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
+                            "flash_size"], "Flash address is out of range"
 
-            elif selPlat["mode"] == 4:
-                assert cOffset >= self._cfi_start_offset, f"Read address must be greater or equal than {hex(self._cfi_start_offset)}"
+                elif selPlat["mode"] == 3:
+                    NANDC = qcom_nandregs.MSM7200NANDController(
+                        self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u8, None, selPlat["flash_regs"], bb_in_data=self.bBadBlockinData.Value, page_size=(-1 if self.cNandSize.Selection == 2 else self.cNandSize.Selection))
+                    assert NANDC._idcode not in [
+                        0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
 
-                if not self._ocdSendCommand("flash probe 0").startswith("flash 'cfi' found at"):
-                    raise Exception("Flash probe failed!")
-                self._ocdSendCommand("flash info 0")
+                    MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
+                    DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
 
-            elif selPlat["mode"] == -1:
-                assert cOffset >= self._cfi_start_offset, f"Read address must be greater or equal than {hex(self._cfi_start_offset)}"
+                    if self.page_width == -1:
+                        if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                            NANDC._page_width = int(
+                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"])
+                    else:
+                        NANDC._page_width = self.page_width
 
-                self._ocdSendCommand("flash probe 0")
-                self._ocdSendCommand("flash info 0")
+                    if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
+                        self._logThreadQueue.push(
+                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
 
-            elif selPlat["mode"] == 5:
-                if selPlat["mode"]["reg_width"] == 0:
-                    NANDC = common_nandregs.GenericNANDController(self.cmd_write_u8, self.cmd_read_u8, self.cmd_write_u8, "big" if self.cTarget.Selection >= self._beTarget else "little",
-                                                                  self.cmd_read_u32, selPlat["flash_cmd"], selPlat["flash_addr"], selPlat["flash_buffer"], selPlat["flash_wait"], selPlat["wait_mask"], (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), 0)
+                    else:
+                        self._logThreadQueue.push(
+                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
 
-                elif selPlat["mode"]["reg_width"] == 1:
-                    NANDC = common_nandregs.GenericNANDController(self.cmd_write_u8, self.cmd_read_u16, self.cmd_write_u16, "big" if self.cTarget.Selection >= self._beTarget else "little",
-                                                                  self.cmd_read_u32, selPlat["flash_cmd"], selPlat["flash_addr"], selPlat["flash_buffer"], selPlat["flash_wait"], selPlat["wait_mask"], (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), 1)
-
-                elif selPlat["mode"]["reg_width"] == 2:
-                    NANDC = common_nandregs.GenericNANDController(self.cmd_write_u16, self.cmd_read_u16, self.cmd_write_u16, "big" if self.cTarget.Selection >= self._beTarget else "little",
-                                                                  self.cmd_read_u32, selPlat["flash_cmd"], selPlat["flash_addr"], selPlat["flash_buffer"], selPlat["flash_wait"], selPlat["wait_mask"], (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), 0)
-
-                elif selPlat["mode"]["reg_width"] == 4:
-                    NANDC = common_nandregs.GenericNANDController(self.cmd_write_u32, self.cmd_read_u32, self.cmd_write_u32, "big" if self.cTarget.Selection >= self._beTarget else "little",
-                                                                  self.cmd_read_u32, selPlat["flash_cmd"], selPlat["flash_addr"], selPlat["flash_buffer"], selPlat["flash_wait"], selPlat["wait_mask"], (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), 0)
-
-                _msleep(const._jtag_init_delay)
-
-                assert NANDC._idcode not in [
-                    0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
-
-                MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
-                DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
-
-                if self.page_width == -1:
                     if DEV_ID_HEX in self._nand_idcodes["devids"]:
-                        NANDC._page_width = int(
-                            self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"])
-                else:
-                    NANDC._page_width = self.page_width
-                    
-                if self.cNandSize.Selection == 2:
+                        NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
+
+                        self._logThreadQueue.push(f'Page size: {NAND_INFO["page_size"]}')
+                        self._logThreadQueue.push(f'Spare size: {NAND_INFO["spare_size"]}')
+                        self._logThreadQueue.push(f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
+                        self._logThreadQueue.push(f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
+                        self._logThreadQueue.push(f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}')
+
+
+                        assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
+                            "flash_size"], "Flash address is out of range"
+
+                elif selPlat["mode"] == 4:
+                    assert cOffset >= self._cfi_start_offset, f"Read address must be greater or equal than {hex(self._cfi_start_offset)}"
+
+                    if not self._ocdSendCommand("flash probe 0").startswith("flash 'cfi' found at"):
+                        raise Exception("Flash probe failed!")
+                    self._ocdSendCommand("flash info 0")
+
+                elif selPlat["mode"] == -1:
+                    assert cOffset >= self._cfi_start_offset, f"Read address must be greater or equal than {hex(self._cfi_start_offset)}"
+
+                    self._ocdSendCommand("flash probe 0")
+                    self._ocdSendCommand("flash info 0")
+
+                elif selPlat["mode"] == 5:
+                    if selPlat["mode"]["reg_width"] == 0:
+                        NANDC = common_nandregs.GenericNANDController(self.cmd_write_u8, self.cmd_read_u8, self.cmd_write_u8, "big" if self.cTarget.Selection >= self._beTarget else "little",
+                                                                    self.cmd_read_u32, selPlat["flash_cmd"], selPlat["flash_addr"], selPlat["flash_buffer"], selPlat["flash_wait"], selPlat["wait_mask"], (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), 0)
+
+                    elif selPlat["mode"]["reg_width"] == 1:
+                        NANDC = common_nandregs.GenericNANDController(self.cmd_write_u8, self.cmd_read_u16, self.cmd_write_u16, "big" if self.cTarget.Selection >= self._beTarget else "little",
+                                                                    self.cmd_read_u32, selPlat["flash_cmd"], selPlat["flash_addr"], selPlat["flash_buffer"], selPlat["flash_wait"], selPlat["wait_mask"], (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), 1)
+
+                    elif selPlat["mode"]["reg_width"] == 2:
+                        NANDC = common_nandregs.GenericNANDController(self.cmd_write_u16, self.cmd_read_u16, self.cmd_write_u16, "big" if self.cTarget.Selection >= self._beTarget else "little",
+                                                                    self.cmd_read_u32, selPlat["flash_cmd"], selPlat["flash_addr"], selPlat["flash_buffer"], selPlat["flash_wait"], selPlat["wait_mask"], (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), 0)
+
+                    elif selPlat["mode"]["reg_width"] == 4:
+                        NANDC = common_nandregs.GenericNANDController(self.cmd_write_u32, self.cmd_read_u32, self.cmd_write_u32, "big" if self.cTarget.Selection >= self._beTarget else "little",
+                                                                    self.cmd_read_u32, selPlat["flash_cmd"], selPlat["flash_addr"], selPlat["flash_buffer"], selPlat["flash_wait"], selPlat["wait_mask"], (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), 0)
+
+                    _msleep(const._jtag_init_delay)
+
+                    assert NANDC._idcode not in [
+                        0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
+
+                    MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
+                    DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
+
+                    if self.page_width == -1:
+                        if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                            NANDC._page_width = int(
+                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"])
+                    else:
+                        NANDC._page_width = self.page_width
+                        
+                    if self.cNandSize.Selection == 2:
+                        if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                            NANDC._page_size = int(
+                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_extended"])
+
+                    if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
+                        self._logThreadQueue.push(
+                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
+
+                    else:
+                        self._logThreadQueue.push(
+                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
+
                     if DEV_ID_HEX in self._nand_idcodes["devids"]:
-                        NANDC._page_size = int(
-                            self._nand_idcodes["devids"][DEV_ID_HEX]["is_extended"])
+                        NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
 
-                if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
-                    self._logThreadQueue.push(
-                        f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
+                        self._logThreadQueue.push(f'Page size: {NAND_INFO["page_size"]}')
+                        self._logThreadQueue.push(f'Spare size: {NAND_INFO["spare_size"]}')
+                        self._logThreadQueue.push(f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
+                        self._logThreadQueue.push(f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
+                        self._logThreadQueue.push(f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}')
 
-                else:
-                    self._logThreadQueue.push(
-                        f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
+                        assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
+                            "flash_size"], "Flash address is out of range"
 
-                if DEV_ID_HEX in self._nand_idcodes["devids"]:
-                    NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
+                elif selPlat["mode"] == 7:
+                    NANDC = common_nandregs.OneNANDController(self.cmd_read_u16, self.cmd_write_u16, self.cmd_read_u8,
+                                                            self.cmd_write_u8, selPlat["o1n_offset"] if "o1n_offset" in selPlat else baseO1N, (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection))
 
-                    self._logThreadQueue.push(f'Page size: {NAND_INFO["page_size"]}')
-                    self._logThreadQueue.push(f'Spare size: {NAND_INFO["spare_size"]}')
-                    self._logThreadQueue.push(f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
-                    self._logThreadQueue.push(f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
-                    self._logThreadQueue.push(f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}')
+                    assert NANDC._idcode not in [
+                        0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
 
-                    assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
-                        "flash_size"], "Flash address is out of range"
+                    MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
 
-            elif selPlat["mode"] == 7:
-                NANDC = common_nandregs.OneNANDController(self.cmd_read_u16, self.cmd_write_u16, self.cmd_read_u8,
-                                                          self.cmd_write_u8, selPlat["o1n_offset"] if "o1n_offset" in selPlat else baseO1N, (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection))
+                    if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
+                        self._logThreadQueue.push(
+                            f'Found OneNAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
 
-                assert NANDC._idcode not in [
-                    0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
+                    else:
+                        self._logThreadQueue.push(
+                            f'Found OneNAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
 
-                MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
+                    self._logThreadQueue.push(f"Flash size: {NANDC._density >> 3}MB")
 
-                if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
-                    self._logThreadQueue.push(
-                        f'Found OneNAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
+                    assert cOffset < (NANDC._density << 17) and eOffset < (
+                        NANDC._density << 17), "Flash address is out of range"
 
-                else:
-                    self._logThreadQueue.push(
-                        f'Found OneNAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
-
-                self._logThreadQueue.push(f"Flash size: {NANDC._density >> 3}MB")
-
-                assert cOffset < (NANDC._density << 17) and eOffset < (
-                    NANDC._density << 17), "Flash address is out of range"
+                if NANDC is None:
+                    self._isInitDone = True
+                    if self._isConnectRemote and self._sio: self._sio.emit("command", {"c":"initDone"})
 
             time.sleep(1)
             self._logSupressed = True
@@ -1978,12 +2003,16 @@ class MainApp(main.main):
     def doReset(self, event):
         if not self._isConnect and not self._isConnectRemote:
             return
+        self._isInitDone = False
+        if self._isConnectRemote and self._sio: self._sio.emit("command", {"c":"initUndone"})
         _msleep(self.reset_delay * 1000)
         self._ocdSendCommand("soft_reset_halt")
 
     def doHardReset(self, event):
         if not self._isConnect and not self._isConnectRemote:
             return
+        self._isInitDone = False
+        if self._isConnectRemote and self._sio: self._sio.emit("command", {"c":"initUndone"})
         _msleep(self.reset_delay * 1000)
         self._ocdSendCommand("reset init")
 
