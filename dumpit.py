@@ -287,14 +287,14 @@ class ForwardApp(forwardDialog.forwardDialog):
             q = self._wsThreadQueue.get_nowait()
 
             if q[0] == "forward_client_connected":
-                self.Unbind(wx.EVT_IDLE)
-                self._loop_running = False
-
                 self._ws_parent._reconnect_token = q[1]["reconnect_token"]
+                self.bConnect.Enable(1)               
+                
+                self.Unbind(wx.EVT_IDLE)
+                self._loop_running = False                
 
                 if self._wsThread:
-                    self._wsThread.join(15)
-                return self.EndModal(1)
+                    self._wsThread.join(15)                 
 
             elif q[1] == "bye":
                 # print("bye event")
@@ -311,6 +311,9 @@ class ForwardApp(forwardDialog.forwardDialog):
         except Exception:
             pass
         self._ws_parent._sio.disconnect()
+        
+    def doConnect(self, event):                    
+        return self.EndModal(1)
 
 
 class FT232HConfig(ft232h_pinconfig.FT232H_Pin_Config):

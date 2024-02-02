@@ -42,8 +42,18 @@ class forwardDialog ( wx.Dialog ):
 
 		bSizer23.Add( self.status, 1, wx.EXPAND |wx.ALL, 5 )
 
+		gSizer3 = wx.GridSizer( 0, 2, 0, 0 )
+
 		self.bStop = wx.Button( self, wx.ID_ANY, u"Stop", wx.DefaultPosition, wx.DefaultSize, 0 )
-		bSizer23.Add( self.bStop, 0, wx.ALL, 5 )
+		gSizer3.Add( self.bStop, 0, wx.ALL, 5 )
+
+		self.bConnect = wx.Button( self, wx.ID_ANY, u"Connect", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.bConnect.Enable( False )
+
+		gSizer3.Add( self.bConnect, 0, wx.ALL|wx.ALIGN_RIGHT, 5 )
+
+
+		bSizer23.Add( gSizer3, 0, wx.EXPAND, 5 )
 
 
 		self.SetSizer( bSizer23 )
@@ -54,6 +64,7 @@ class forwardDialog ( wx.Dialog ):
 		# Connect Events
 		self.Bind( wx.EVT_IDLE, self.doLoop )
 		self.bStop.Bind( wx.EVT_BUTTON, self.doStop )
+		self.bConnect.Bind( wx.EVT_BUTTON, self.doConnect )
 
 	def __del__( self ):
 		pass
@@ -64,6 +75,9 @@ class forwardDialog ( wx.Dialog ):
 		event.Skip()
 
 	def doStop( self, event ):
+		event.Skip()
+
+	def doConnect( self, event ):
 		event.Skip()
 
 
