@@ -1720,23 +1720,23 @@ class MainApp(main.main):
                         NANDC._page_width = self.page_width
 
                     if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
 
                     else:
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
 
                     if DEV_ID_HEX in self._nand_idcodes["devids"]:
                         NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
 
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Page size: {NAND_INFO["page_size"]}')
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Spare size: {NAND_INFO["spare_size"]}')
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
 
                         assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
@@ -1752,25 +1752,25 @@ class MainApp(main.main):
                     DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
 
                     if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
 
                     else:
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
 
                     if DEV_ID_HEX in self._nand_idcodes["devids"]:
                         NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
 
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Page size: {NAND_INFO["page_size"]}')
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Spare size: {NAND_INFO["spare_size"]}')
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}')
 
                         assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
@@ -1793,25 +1793,25 @@ class MainApp(main.main):
                         NANDC._page_width = self.page_width
 
                     if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
 
                     else:
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
 
                     if DEV_ID_HEX in self._nand_idcodes["devids"]:
                         NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
 
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Page size: {NAND_INFO["page_size"]}')
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Spare size: {NAND_INFO["spare_size"]}')
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}')
 
                         assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
@@ -1868,25 +1868,25 @@ class MainApp(main.main):
                                 self._nand_idcodes["devids"][DEV_ID_HEX]["is_extended"])
 
                     if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
 
                     else:
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
 
                     if DEV_ID_HEX in self._nand_idcodes["devids"]:
                         NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
 
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Page size: {NAND_INFO["page_size"]}')
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Spare size: {NAND_INFO["spare_size"]}')
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}')
 
                         assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
@@ -1902,14 +1902,14 @@ class MainApp(main.main):
                     MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
 
                     if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Found OneNAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
 
                     else:
-                        self._logThreadQueue.push(
+                        self._logThreadQueue.put(
                             f'Found OneNAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
 
-                    self._logThreadQueue.push(
+                    self._logThreadQueue.put(
                         f"Flash size: {NANDC._density >> 3}MB")
 
                     assert cOffset < (NANDC._density << 17) and eOffset < (
