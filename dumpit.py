@@ -1,11 +1,13 @@
 import wx
 import wx.richtext
+import wx.stc
 from res import main
 from res import forwardDialog
 from res import ft232r_pinconfig
 from res import ft232h_pinconfig
 from res import resetDelay
 from res import nandControlConfig
+from res import nandInitScript
 import os
 import sys
 import const
@@ -288,13 +290,20 @@ class ForwardApp(forwardDialog.forwardDialog):
 
             if q[0] == "forward_client_connected":
                 self._ws_parent._reconnect_token = q[1]["reconnect_token"]
-                self.bConnect.Enable(1)               
-                
+                self.bConnect.Enable(1)
+
                 self.Unbind(wx.EVT_IDLE)
-                self._loop_running = False                
+                self._loop_running = False
 
                 if self._wsThread:
-                    self._wsThread.join(15)                 
+                    self._wsThread.join(15)
+
+                self.lPin.Show(False)
+                self.tPin.Show(False)
+                
+                self.lConnect.Show()
+                
+                self.Layout()
 
             elif q[1] == "bye":
                 # print("bye event")
@@ -312,7 +321,11 @@ class ForwardApp(forwardDialog.forwardDialog):
             pass
         self._ws_parent._sio.disconnect()
         
-    def doConnect(self, event):                    
+        if not self._loop_running:
+            self._ws_parent._doAnalytics("disconnect", reason=1)            
+            return self.EndModal(0)
+
+    def doConnect(self, event):
         return self.EndModal(1)
 
 
@@ -602,6 +615,8 @@ class NANDControllerConfig(nandControlConfig.NANDControllerConfig):
         self.tCustomCFG1.Value = f"{self.base_parent.custom_cfg1:02x}"
         self.tCustomCFG2.Value = f"{self.base_parent.custom_cfg2:02x}"
         self.tCustomCFGCMN.Value = f"{self.base_parent.custom_cfg_common:02x}"
+        
+        self.init_code = self.base_parent.nand_init_code
 
     def doApply(self, event):
         self.base_parent.page_width = self.cPageWidth.Selection - 1
@@ -611,8 +626,28 @@ class NANDControllerConfig(nandControlConfig.NANDControllerConfig):
         self.base_parent.custom_cfg1 = int(self.tCustomCFG1.Value, 16)
         self.base_parent.custom_cfg2 = int(self.tCustomCFG2.Value, 16)
         self.base_parent.custom_cfg_common = int(self.tCustomCFGCMN.Value, 16)
+        
+        self.base_parent.nand_init_code = self.init_code
         self.EndModal(0)
 
+    def doCancel(self, event):
+        self.EndModal(0)
+        
+    def doCodeEdit(self, event):
+        InitCodeEditor(self).ShowModal()
+
+class InitCodeEditor(nandInitScript.NANDCodeEdit):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.base_parent: NANDControllerConfig = parent
+        
+        self.tTCLCode.SetLexer(wx.stc.STC_LEX_TCL)
+        self.tTCLCode.Value = self.base_parent.init_code
+        
+    def doApply(self, event):
+        self.base_parent.init_code = self.tTCLCode.Value
+        self.EndModal(0)
+        
     def doCancel(self, event):
         self.EndModal(0)
 
@@ -767,6 +802,8 @@ class MainApp(main.main):
         self.custom_cfg1 = -1
         self.custom_cfg2 = -1
         self.custom_cfg_common = -1
+        
+        self.nand_init_code = ""
 
         self._isInitDone = False
 
@@ -849,6 +886,8 @@ class MainApp(main.main):
             self.custom_cfg2 = cfg["nand_custom_cfg2"]
             self.custom_cfg_common = cfg["nand_custom_cfg_common"]
             self.page_width = cfg["nand_page_width"]
+            
+            self.nand_init_code = cfg["nand_init_code"]
 
         if not self.tUserID.Value:
             self.tUserID.Value = str(uuid.uuid4())
@@ -927,6 +966,8 @@ class MainApp(main.main):
             cfg["nand_custom_cfg2"] = self.custom_cfg2
             cfg["nand_custom_cfg_common"] = self.custom_cfg_common
             cfg["nand_page_width"] = self.page_width
+            
+            cfg["nand_init_code"] = self.nand_init_code
 
             cfg["dcc_used"] = self._loaded_dcc is not None
 
@@ -1434,7 +1475,7 @@ class MainApp(main.main):
 
             token = self._sio.call("forward_request", timeout=5)
             forward_wait = ForwardApp(self, token["token"]).ShowModal()
-            if forward_wait:
+            if forward_wait == 1:
                 # self.bReconnectRemote.Show()
                 # self.bForwardRemote.Hide()
 
@@ -1585,7 +1626,7 @@ class MainApp(main.main):
     def cmd_read_cp15(self, cr_n, op_1, cr_m, op_2):
         if not self._isConnect and not self._isConnectRemote:
             return 0
-        
+
         try:
             return int(self._ocdSendCommand(f"arm mrc 15 {op_1} {cr_n} {cr_m} {op_2}"), 16)
 
@@ -1627,16 +1668,20 @@ class MainApp(main.main):
         self._doAnalytics("dump_start", addr_start=cOffset,
                           addr_end=eOffset, is_memory=True)
 
+        self._ocdSendCommand("halt")
+
         self._logSupressed = True
         self._logThreadQueue.put(
             f"Dump memory started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
+
+        CFI_READ_BUFFER = 0x8000
 
         try:
             with open(name, "wb") as tempFile:
                 while cOffset < eOffset and not self._isReadCanceled:
                     tempFile.write(self.cmd_read_u8(
-                        cOffset, min(0x200, eOffset - cOffset)))
-                    cOffset += min(0x200, eOffset - cOffset)
+                        cOffset, min(CFI_READ_BUFFER, eOffset - cOffset)))
+                    cOffset += min(CFI_READ_BUFFER, eOffset - cOffset)
 
                     self._progMsgQueue.put(cOffset/eOffset)
 
@@ -1692,6 +1737,12 @@ class MainApp(main.main):
         self._btnMsgQueue.put(True)
         self._doAnalytics("dump_start", addr_start=cOffset,
                           addr_end=eOffset, is_memory=False)
+
+        self._ocdSendCommand("halt")
+        
+        if self.nand_init_code:
+            for l in self.nand_init_code.splitlines():
+                self._ocdSendCommand(l)
 
         selPlat = const._platforms[self.cChipset.Selection]
 
@@ -1930,12 +1981,14 @@ class MainApp(main.main):
             self._logThreadQueue.put(
                 f"Dump flash started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
 
+            CFI_READ_BUFFER = 0x8000
+
             with open(name, "wb") as tempFile:
                 while cOffset < eOffset and not self._isReadCanceled:
                     if self._loaded_dcc is not None or selPlat["mode"] in [-1, 4]:
                         tempFile.write(self.cmd_read_flash(
-                            cOffset - self._cfi_start_offset, 0x200))
-                        cOffset += 0x200
+                            cOffset - self._cfi_start_offset, min(CFI_READ_BUFFER, eOffset - cOffset)))
+                        cOffset += min(CFI_READ_BUFFER, eOffset - cOffset)
 
                     elif NANDC is not None:
                         data, spare, bbm = NANDC.read(cOffset >> ((11 if self.cNandSize.Selection == 1 else 9) if selPlat["mode"] != 7 else (
@@ -2336,6 +2389,8 @@ class MainApp(main.main):
             cfg["nand_custom_cfg2"] = self.custom_cfg2
             cfg["nand_custom_cfg_common"] = self.custom_cfg_common
             cfg["nand_page_width"] = self.page_width
+            
+            cfg["nand_init_code"] = self.nand_init_code
 
             cfg["last_updated"] = int(datetime.datetime.today().timestamp())
 

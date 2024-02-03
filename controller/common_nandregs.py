@@ -32,6 +32,8 @@ class GenericNANDController():
 
         self._cmd_write(self._nfi_cle, 0xff)
         self._cmd_write(self._nfi_cle, 0x90)
+        self._cmd_write(self._nfi_ale, 0x0)
+
         self._idcode = 0
 
         for _ in range(4):
@@ -282,20 +284,27 @@ class OneNANDController():
 
     def read(self, page: int):
         if self._ecc_enabled:
-            self._cmd_write(self._o1n_base + O1N_REGS.REG_SYS_CFG1.value, self._cmd_read(self._o1n_base + O1N_REGS.REG_SYS_CFG1.value) & ~0x100)
+            self._cmd_write(self._o1n_base + O1N_REGS.REG_SYS_CFG1.value,
+                            self._cmd_read(self._o1n_base + O1N_REGS.REG_SYS_CFG1.value) & ~0x100)
         else:
-            self._cmd_write(self._o1n_base + O1N_REGS.REG_SYS_CFG1.value, self._cmd_read(self._o1n_base + O1N_REGS.REG_SYS_CFG1.value) | 0x100)
+            self._cmd_write(self._o1n_base + O1N_REGS.REG_SYS_CFG1.value,
+                            self._cmd_read(self._o1n_base + O1N_REGS.REG_SYS_CFG1.value) | 0x100)
 
         self._cmd_write(self._o1n_base + O1N_REGS.REG_INTERRUPT.value, 0x0)
         self._cmd_write(self._o1n_base + O1N_REGS.REG_ECC_STATUS.value, 0x0)
-        self._cmd_write(self._o1n_base + O1N_REGS.REG_START_BUFFER.value, 0x800)
+        self._cmd_write(self._o1n_base +
+                        O1N_REGS.REG_START_BUFFER.value, 0x800)
 
-        UPPER_BANK = 0x8000 if self._ddp and (page >> 6) >= self._density else 0x0
+        UPPER_BANK = 0x8000 if self._ddp and (
+            page >> 6) >= self._density else 0x0
 
-        self._cmd_write(self._o1n_base + O1N_REGS.REG_START_ADDRESS1.value, UPPER_BANK | ((page >> 6) & (self._density - 1)))
-        self._cmd_write(self._o1n_base + O1N_REGS.REG_START_ADDRESS2.value, UPPER_BANK)
+        self._cmd_write(self._o1n_base + O1N_REGS.REG_START_ADDRESS1.value,
+                        UPPER_BANK | ((page >> 6) & (self._density - 1)))
+        self._cmd_write(self._o1n_base +
+                        O1N_REGS.REG_START_ADDRESS2.value, UPPER_BANK)
 
-        self._cmd_write(self._o1n_base + O1N_REGS.REG_START_ADDRESS8.value, (page & 63) << 2)
+        self._cmd_write(self._o1n_base +
+                        O1N_REGS.REG_START_ADDRESS8.value, (page & 63) << 2)
         self._cmd_write(self._o1n_base +
                         O1N_REGS.REG_COMMAND.value, O1N_NANDOPS.READ)
 

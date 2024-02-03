@@ -32,6 +32,15 @@ class forwardDialog ( wx.Dialog ):
 
 		bSizer23.Add( self.lPin, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL|wx.EXPAND, 5 )
 
+		self.lConnect = wx.StaticText( self, wx.ID_ANY, u"Ready to Connect. Time your\nJTAG interface connection\n(click Connect)", wx.DefaultPosition, wx.DefaultSize, wx.ALIGN_CENTER_HORIZONTAL )
+		self.lConnect.Wrap( -1 )
+
+		self.lConnect.SetFont( wx.Font( 16, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, "Sans" ) )
+		self.lConnect.Hide()
+		self.lConnect.SetMinSize( wx.Size( -1,30 ) )
+
+		bSizer23.Add( self.lConnect, 1, wx.ALL|wx.EXPAND, 5 )
+
 		self.tPin = wx.TextCtrl( self, wx.ID_ANY, u"1a2b3c4d", wx.DefaultPosition, wx.DefaultSize, wx.TE_CENTER|wx.TE_READONLY )
 		self.tPin.SetFont( wx.Font( 32, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 

@@ -17,7 +17,7 @@ import wx.xrc
 class NANDControllerConfig ( wx.Dialog ):
 
 	def __init__( self, parent ):
-		wx.Dialog.__init__ ( self, parent, id = wx.ID_ANY, title = wx.EmptyString, pos = wx.DefaultPosition, size = wx.Size( 411,226 ), style = wx.DEFAULT_DIALOG_STYLE )
+		wx.Dialog.__init__ ( self, parent, id = wx.ID_ANY, title = wx.EmptyString, pos = wx.DefaultPosition, size = wx.Size( 410,240 ), style = wx.DEFAULT_DIALOG_STYLE )
 
 		self.SetSizeHints( wx.DefaultSize, wx.DefaultSize )
 
@@ -102,6 +102,14 @@ class NANDControllerConfig ( wx.Dialog ):
 
 		bSizer701.Add( bSizer69111, 0, wx.EXPAND, 5 )
 
+		bSizer691111 = wx.BoxSizer( wx.HORIZONTAL )
+
+		self.bCodeEdit = wx.Button( self, wx.ID_ANY, u"Edit Init Code", wx.DefaultPosition, wx.DefaultSize, 0 )
+		bSizer691111.Add( self.bCodeEdit, 0, wx.ALL, 5 )
+
+
+		bSizer701.Add( bSizer691111, 1, wx.ALIGN_RIGHT, 5 )
+
 
 		bSizer68.Add( bSizer701, 1, wx.EXPAND, 5 )
 
@@ -126,6 +134,7 @@ class NANDControllerConfig ( wx.Dialog ):
 		self.Centre( wx.BOTH )
 
 		# Connect Events
+		self.bCodeEdit.Bind( wx.EVT_BUTTON, self.doCodeEdit )
 		self.bApply.Bind( wx.EVT_BUTTON, self.doApply )
 		self.bCancel.Bind( wx.EVT_BUTTON, self.doCancel )
 
@@ -134,6 +143,9 @@ class NANDControllerConfig ( wx.Dialog ):
 
 
 	# Virtual event handlers, override them in your derived class
+	def doCodeEdit( self, event ):
+		event.Skip()
+
 	def doApply( self, event ):
 		event.Skip()
 
