@@ -88,6 +88,14 @@ class ResetDelayConfig ( wx.Dialog ):
 
 		bSizer59.Add( bSizer584, 1, wx.EXPAND, 5 )
 
+		bSizer5842 = wx.BoxSizer( wx.HORIZONTAL )
+
+		self.cUseCustom = wx.CheckBox( self, wx.ID_ANY, u"Use Custom Timings", wx.DefaultPosition, wx.DefaultSize, wx.ALIGN_RIGHT )
+		bSizer5842.Add( self.cUseCustom, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+
+		bSizer59.Add( bSizer5842, 1, wx.ALIGN_RIGHT, 5 )
+
 		bSizer5841 = wx.BoxSizer( wx.HORIZONTAL )
 
 		self.bApply = wx.Button( self, wx.ID_ANY, u"Apply", wx.DefaultPosition, wx.DefaultSize, 0 )

@@ -590,6 +590,7 @@ class ResetConfig(resetDelay.ResetDelayConfig):
         self.nNTRSTDelay.Value = self.base_parent.ntrst_reset_delay
         self.nSRSTDelay.Value = self.base_parent.nsrst_reset_delay
         self.nResetDelay.Value = self.base_parent.reset_delay
+        self.cUseCustom.Value = self.base_parent.custom_reset
 
     def bDoApply(self, event):
         self.base_parent.ntrst_reset_pulse = self.nNTRSTWidth.Value
@@ -597,6 +598,7 @@ class ResetConfig(resetDelay.ResetDelayConfig):
         self.base_parent.ntrst_reset_delay = self.nNTRSTDelay.Value
         self.base_parent.nsrst_reset_delay = self.nSRSTDelay.Value
         self.base_parent.reset_delay = self.nResetDelay.Value
+        self.base_parent.custom_reset = self.cUseCustom.Value
         self.EndModal(0)
 
     def bDoCancel(self, event):
@@ -794,6 +796,7 @@ class MainApp(main.main):
         self.nsrst_reset_pulse = 100
 
         self.reset_delay = 100
+        self.custom_reset = False
 
         self.page_width = -1
 
@@ -825,6 +828,7 @@ class MainApp(main.main):
             self.ntrst_reset_delay = cfg["trst_reset_delay"]
             self.nsrst_reset_delay = cfg["srst_reset_delay"]
             self.reset_delay = cfg["reset_delay"]
+            self.custom_reset = cfg["custom_reset"]
             self.bSkipInit.Value = cfg["skip_init"]
             self.tStart.Value = cfg["start"]
             self.tEnd.Value = cfg["end"]
@@ -913,6 +917,7 @@ class MainApp(main.main):
             cfg["trst_reset_delay"] = self.ntrst_reset_delay
             cfg["srst_reset_delay"] = self.nsrst_reset_delay
             cfg["reset_delay"] = self.reset_delay
+            cfg["custom_reset"] = self.custom_reset
             cfg["skip_init"] = self.bSkipInit.Value
             cfg["start"] = self.tStart.Value
             cfg["end"] = self.tEnd.Value
@@ -2330,6 +2335,7 @@ class MainApp(main.main):
             cfg["trst_reset_delay"] = self.ntrst_reset_delay
             cfg["srst_reset_delay"] = self.nsrst_reset_delay
             cfg["reset_delay"] = self.reset_delay
+            cfg["custom_reset"] = self.custom_reset
             cfg["skip_init"] = self.bSkipInit.Value
             cfg["start"] = self.tStart.Value
             cfg["end"] = self.tEnd.Value
@@ -2435,7 +2441,11 @@ def getInitCmd(self: MainApp):
         if const._ft232h_adapters[self.cFTAdapter.Selection][1] != "":
             cInit = f"{const._ft232h_adapters[self.cFTAdapter.Selection][1]} ftdi tdo_sample_edge {['rising', 'falling'][self.rSamplingEdge.Selection]};"
 
-    INIT_CMD = f"{cInit} telnet_port 0; gdb_port 0; tcl_port pipe; reset_config {const._reset_type[self.cResetMode.Selection][1]}; jtag_ntrst_delay {self.ntrst_reset_delay}; adapter srst delay {self.nsrst_reset_delay}; jtag_ntrst_assert_width {self.ntrst_reset_pulse}; adapter srst pulse_width {self.nsrst_reset_pulse}; "
+    if self.custom_timings:
+        INIT_CMD = f"{cInit} telnet_port 0; gdb_port 0; tcl_port pipe; reset_config {const._reset_type[self.cResetMode.Selection][1]}; jtag_ntrst_delay {self.ntrst_reset_delay}; adapter srst delay {self.nsrst_reset_delay}; jtag_ntrst_assert_width {self.ntrst_reset_pulse}; adapter srst pulse_width {self.nsrst_reset_pulse}; "
+        
+    else:
+        INIT_CMD = f"{cInit} telnet_port 0; gdb_port 0; tcl_port pipe; reset_config {const._reset_type[self.cResetMode.Selection][1]}; "
 
     if int(self.nSpeed.Value) <= 0:
         INIT_CMD += f"jtag_rclk 1000; "
