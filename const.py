@@ -308,6 +308,7 @@ _platforms_b = _platforms_b = [
         "flash_int_clear": -1,
         "flash_int": -1,
         "flash_nand_int": 0x6000,        
+        "flash_has_header": False,
         "init": [
             {"name": "SLEEP_CTL_WB", "address": "30006d0", "type": 4, "value": "0x1"}
         ],
@@ -319,6 +320,7 @@ _platforms_b = _platforms_b = [
         "flash_int_clear": 0x8400024C,
         "flash_int": 0x84000244,
         "flash_nand_int": 0x6,        
+        "flash_has_header": False,
         "init": [
             {
                 "name": "MSM_CLK_ENA0",
@@ -425,7 +427,8 @@ _platforms_b = _platforms_b = [
         "flash_regs": 0x64000000,
         "flash_int_clear": 0x80000C84,
         "flash_int": 0x80000C84,
-        "flash_nand_int": 0x6000,        
+        "flash_nand_int": 0x6000,  
+        "flash_has_header": False,      
         "init": [
             {"name": "", "address": "80001200", "type": 4, "value": "0xFFFFFFFF"},
             {"name": "", "address": "80001204", "type": 4, "value": "0xFFFFFFFF"},
@@ -445,7 +448,8 @@ _platforms_b = _platforms_b = [
         "flash_regs": 0x64000000,
         "flash_int_clear": 0x80000904,
         "flash_int": 0x80000950,
-        "flash_nand_int": 0x6000,        
+        "flash_nand_int": 0x6000,     
+        "flash_has_header": False,   
         "init": [
             {"name": "", "address": "80002200", "type": 4, "value": "0xFFFFFFFF"},
             {"name": "", "address": "80002204", "type": 4, "value": "0xFFFFFFFF"},
@@ -465,7 +469,8 @@ _platforms_b = _platforms_b = [
         "flash_regs": 0x60000000,
         "flash_int_clear": 0x80000904,
         "flash_int": 0x80000958,
-        "flash_nand_int": 0x6000,        
+        "flash_nand_int": 0x6000,      
+        "flash_has_header": True,  
         "init": [],
     },    
     {

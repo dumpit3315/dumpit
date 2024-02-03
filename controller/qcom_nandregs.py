@@ -149,7 +149,7 @@ class MSM6550_NANDCFG2_BITS_MASK(enum.Enum):
 
 
 class MSM6250NANDController(_BaseQCOMNANDController):
-    def __init__(self, read32_func, write32_func, read8_func, write8_func, base: int = 0x64000000, page_size: int = 0, nand_int_clr_addr: int = 0x8400024c, nand_int_addr: int = 0x84000244, nand_op_reset_flag: int = 6, skip_init: bool = False):
+    def __init__(self, read32_func, write32_func, read8_func, write8_func, base: int = 0x64000000, page_size: int = 0, nand_int_clr_addr: int = 0x8400024c, nand_int_addr: int = 0x84000244, nand_op_reset_flag: int = 6, skip_init: bool = False, msm6550_discrepancy: bool = False):
         if page_size != 0:
             raise ValueError(
                 "MSM6100/6125/6250/6300/6500/6550 only supports small block NAND")
@@ -158,6 +158,7 @@ class MSM6250NANDController(_BaseQCOMNANDController):
         self._nand_int_addr = nand_int_addr
         self._nand_reset_op = nand_op_reset_flag
         self._skip_reg_init = skip_init
+        self._msm6500_discrepancy = msm6550_discrepancy
 
         if not self._skip_reg_init:
             self._cmd_write(0x84000174, 0)
@@ -232,7 +233,15 @@ class MSM6250NANDController(_BaseQCOMNANDController):
         while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS.value, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
             time.sleep(0.05)
 
-        return self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value, 0x200), self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 0x200, 0x10), b""
+        if self._msm6500_discrepancy:
+            if self._page_width == 1:
+                return self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 2, 0x200), self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 0x202, 0xe) + b"\xff\xff", self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value, 0x2)
+            
+            else:
+                return self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 1, 0x200), self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 0x201, 0xf) + b"\xff", self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value, 0x1)
+            
+        else:
+            return self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value, 0x200), self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 0x200, 0x10), b""
 
 
 class MSM6800_NANDREGS(enum.Enum):

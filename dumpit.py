@@ -939,7 +939,7 @@ class MainApp(main.main):
     def _doLogging(self):
         for l in _unbuffered(self._ocd, "stderr"):
             try:
-                if not self._logSupressed:
+                if not self._logSupressed or l.startswith(b"Error:"):
                     self._logThreadQueue.put(l.decode("utf-8"))
                     if self._isForward:
                         log_randid = random.randbytes(16).hex()
@@ -970,7 +970,7 @@ class MainApp(main.main):
                                 print("init undone received")
                             self._isInitDone = False
 
-                    elif p[0] == "log" and not self._logSupressed:
+                    elif p[0] == "log" and (not self._logSupressed or p[1].startswith(b"Error:")):
                         self._logThreadQueue.put(p[1])
 
                     elif p[0] == "bye":
@@ -1533,6 +1533,7 @@ class MainApp(main.main):
             return int(c, 16) if size <= 1 else bytes([int(x, 16) for x in c.split(" ")])
 
         else:
+            self._logThreadQueue.put(f"Invalid hex data: {c}")
             return 0xff if size <= 1 else b"\xff" * size
 
     def cmd_read_u16(self, offset: int, size: int = 1):
@@ -1547,6 +1548,7 @@ class MainApp(main.main):
             return int(c, 16) if size <= 1 else [int(x, 16) for x in c.split(" ")]
 
         else:
+            self._logThreadQueue.put(f"Invalid hex data: {c}")
             return 0xffff if size <= 1 else b"\xff\xff" * size
 
     def cmd_read_u32(self, offset: int, size: int = 1):
@@ -1561,6 +1563,7 @@ class MainApp(main.main):
             return int(c, 16) if size <= 1 else [int(x, 16) for x in c.split(" ")]
 
         else:
+            self._logThreadQueue.put(f"Invalid hex data: {c}")
             return 0xffffffff if size <= 1 else b"\xff\xff\xff\xff" * size
 
     def cmd_read_flash(self, offset: int, size: int = 1):
@@ -1576,11 +1579,13 @@ class MainApp(main.main):
             return bytes([int(x, 16) for x in c.split(" ")])
 
         else:
+            self._logThreadQueue.put(f"Invalid hex data: {c}")
             return b"\xff" * size
 
     def cmd_read_cp15(self, cr_n, op_1, cr_m, op_2):
         if not self._isConnect and not self._isConnectRemote:
             return 0
+        
         try:
             return int(self._ocdSendCommand(f"arm mrc 15 {op_1} {cr_n} {cr_m} {op_2}"), 16)
 
@@ -1705,7 +1710,7 @@ class MainApp(main.main):
 
                 elif selPlat["mode"] == 1:
                     NANDC = qcom_nandregs.MSM6250NANDController(self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u8, None,
-                                                                selPlat["flash_regs"], nand_int_clr_addr=selPlat["flash_int_clear"], nand_int_addr=selPlat["flash_int"], nand_op_reset_flag=selPlat["flash_nand_int"])
+                                                                selPlat["flash_regs"], nand_int_clr_addr=selPlat["flash_int_clear"], nand_int_addr=selPlat["flash_int"], nand_op_reset_flag=selPlat["flash_nand_int"], msm6550_discrepancy=selPlat["flash_has_header"])
                     assert NANDC._idcode not in [
                         0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
 
