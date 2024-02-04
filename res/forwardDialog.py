@@ -32,7 +32,7 @@ class forwardDialog ( wx.Dialog ):
 
 		bSizer23.Add( self.lPin, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL|wx.EXPAND, 5 )
 
-		self.lConnect = wx.StaticText( self, wx.ID_ANY, u"Ready to Connect. Time your\nJTAG interface connection\n(click Connect)", wx.DefaultPosition, wx.DefaultSize, wx.ALIGN_CENTER_HORIZONTAL )
+		self.lConnect = wx.StaticText( self, wx.ID_ANY, u"Ready to Connect. Time your\nJTAG interface connection\n(click Connect)\nAuto-connect in 15 seconds.", wx.DefaultPosition, wx.DefaultSize, wx.ALIGN_CENTER_HORIZONTAL )
 		self.lConnect.Wrap( -1 )
 
 		self.lConnect.SetFont( wx.Font( 16, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, "Sans" ) )
@@ -67,6 +67,8 @@ class forwardDialog ( wx.Dialog ):
 
 		self.SetSizer( bSizer23 )
 		self.Layout()
+		self.pConnectTimeout = wx.Timer()
+		self.pConnectTimeout.SetOwner( self, wx.ID_ANY )
 
 		self.Centre( wx.BOTH )
 
@@ -74,6 +76,7 @@ class forwardDialog ( wx.Dialog ):
 		self.Bind( wx.EVT_IDLE, self.doLoop )
 		self.bStop.Bind( wx.EVT_BUTTON, self.doStop )
 		self.bConnect.Bind( wx.EVT_BUTTON, self.doConnect )
+		self.Bind( wx.EVT_TIMER, self.doConnectTimeout, id=wx.ID_ANY )
 
 	def __del__( self ):
 		pass
@@ -87,6 +90,9 @@ class forwardDialog ( wx.Dialog ):
 		event.Skip()
 
 	def doConnect( self, event ):
+		event.Skip()
+
+	def doConnectTimeout( self, event ):
 		event.Skip()
 
 

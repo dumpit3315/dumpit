@@ -6901,7 +6901,7 @@
             <property name="gripper">0</property>
             <property name="hidden">1</property>
             <property name="id">wxID_ANY</property>
-            <property name="label">Ready to Connect. Time your&#x0A;JTAG interface connection&#x0A;(click Connect)</property>
+            <property name="label">Ready to Connect. Time your&#x0A;JTAG interface connection&#x0A;(click Connect)&#x0A;Auto-connect in 15 seconds.</property>
             <property name="markup">0</property>
             <property name="max_size"></property>
             <property name="maximize_button">0</property>
@@ -7223,6 +7223,15 @@
             </object>
           </object>
         </object>
+      </object>
+      <object class="wxTimer" expanded="true">
+        <property name="enabled">0</property>
+        <property name="id">wxID_ANY</property>
+        <property name="name">pConnectTimeout</property>
+        <property name="oneshot">1</property>
+        <property name="period">15000</property>
+        <property name="permission">protected</property>
+        <event name="OnTimer">doConnectTimeout</event>
       </object>
     </object>
     <object class="Dialog" expanded="false">

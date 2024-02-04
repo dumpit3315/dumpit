@@ -304,6 +304,8 @@ class ForwardApp(forwardDialog.forwardDialog):
                 self.lConnect.Show()
                 
                 self.Layout()
+                
+                self.pConnectTimeout.StartOnce(15000)
 
             elif q[1] == "bye":
                 # print("bye event")
@@ -326,6 +328,9 @@ class ForwardApp(forwardDialog.forwardDialog):
             return self.EndModal(0)
 
     def doConnect(self, event):
+        return self.EndModal(1)
+    
+    def doConnectTimeout(self, event):
         return self.EndModal(1)
 
 
