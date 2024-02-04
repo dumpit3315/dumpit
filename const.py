@@ -298,7 +298,7 @@ _platforms_b = _platforms_b = [
         "chip_width": 2,
         "bus_width": 2,
         "init": [
-            {"name": "SLEEP_CTL_WB", "address": "30006d0", "type": 4, "value": "0x1"}
+        #    {"name": "SLEEP_CTL_WB", "address": "30006d0", "type": 4, "value": "0x1"}
         ],
     },
     {
@@ -310,7 +310,7 @@ _platforms_b = _platforms_b = [
         "flash_nand_int": 0x6000,        
         "flash_has_header": False,
         "init": [
-            {"name": "SLEEP_CTL_WB", "address": "30006d0", "type": 4, "value": "0x1"}
+        #    {"name": "SLEEP_CTL_WB", "address": "30006d0", "type": 4, "value": "0x1"}
         ],
     },
     {
@@ -492,6 +492,13 @@ _platforms_b = _platforms_b = [
         "flash_int_clear": 0x80000414,
         "flash_int": 0x80000488,
         "flash_nand_int": 0x2,
+        "init": [],
+    },
+    {
+        "name": "QSC60x0",
+        "mode": 4,
+        "chip_width": 2,
+        "bus_width": 2,
         "init": [],
     },
     {
