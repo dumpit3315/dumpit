@@ -2405,14 +2405,20 @@ class MainApp(main.main):
 
             wx.Exit()
 
+    def doOCDCmdExecThread(self, cmd):
+        self._logThreadQueue.put(
+            f"command returned: {self._ocdSendCommand(cmd)}")
+
     def doOCDCmdExec(self, event):
         temp = self.tOCDCmd.Value
         self.tOCDCmd.Value = ""
         if not self._isConnect and not self._isConnectRemote:
             return
 
-        self._logThreadQueue.put(
-            f"command returned: {self._ocdSendCommand(temp)}")
+        t = threading.Thread(target=self.doOCDCmdExecThread, args=(temp,))
+            
+        t.daemon = True
+        t.start()    
 
     def doRegenUUID(self, event):
         global _PTRACKCOUNT
@@ -2483,12 +2489,15 @@ def getInitCmd(self: MainApp):
             INIT_CMD += "flash bank target.dcc ocl 0 0 0 0 target.cpu; set _DCC_PATH {" + path_escaped + \
                 "}; " + \
                 f"set _DCC_START_OFFSET {hex(intelhex.IntelHex(self._loaded_dcc).minaddr())}; "
+            INIT_CMD += 'proc test_flash {} { flash probe 0; for {set i 0} {$i < 0x04000000} {incr i 0x8000} { set v [flash read_bank_memory 0 $i 0x8000]; echo "Flash read on: 0x[format %X $i]"; }; echo "read is all done"; }; '
 
         elif const._platforms[self.cChipset.Selection]["mode"] == -1:
             INIT_CMD += "flash bank target.dcc dummy_flash 0 0 0 0 target.cpu; "
+            INIT_CMD += 'proc test_flash {} { flash probe 0; for {set i 0} {$i < 0x04000000} {incr i 0x8000} { set v [flash read_bank_memory 0 $i 0x8000]; echo "Flash read on: 0x[format %X $i]"; }; echo "read is all done"; }; '
 
         elif const._platforms[self.cChipset.Selection]["mode"] == 4:
             INIT_CMD += f"flash bank target.nor cfi 0x{self.tStart.Value} {hex(int(self.tEnd.Value, 16) - int(self.tStart.Value, 16))} {const._platforms[self.cChipset.Selection]['chip_width']} {const._platforms[self.cChipset.Selection]['bus_width']} target.cpu; "
+            INIT_CMD += 'proc test_flash {} { flash probe 0; for {set i 0} {$i < 0x04000000} {incr i 0x8000} { set v [flash read_bank_memory 0 $i 0x8000]; echo "Flash read on: 0x[format %X $i]"; }; echo "read is all done"; }; '
             self._cfi_start_offset = int(self.tStart.Value, 16)
 
         INIT_CMD += "target.cpu configure -event examine-end { halt; "
