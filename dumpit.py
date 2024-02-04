@@ -2510,7 +2510,9 @@ def getInitCmd(self: MainApp):
             INIT_CMD += 'proc test_flash {} { flash probe 0; for {set i 0} {$i < 0x04000000} {incr i 0x10000} { set v [flash read_bank_memory 0 $i 0x10000]; echo "Flash read on: 0x[format %X $i]"; }; echo "read is all done"; }; '
             self._cfi_start_offset = int(self.tStart.Value, 16)
 
-        INIT_CMD += "target.cpu configure -event examine-end { halt; sleep 2000; " + additionalCFG
+        INIT_CMD += additionalCFG
+
+        INIT_CMD += "target.cpu configure -event examine-end { halt; sleep 2000; "
         if not self.bSkipInit.Value:
             for i in const._platforms[self.cChipset.Selection]["init"]:
                 if i["type"] == 1:
