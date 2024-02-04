@@ -1298,7 +1298,7 @@ class MainApp(main.main):
 
             self.status.Value = f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n'
             self._ocd = subprocess.Popen([getOCDExec(
-            ), "-c", INIT_CMD], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            ), "-c", INIT_CMD], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=os.path.dirname(__file__))
 
             self._ocdSendCommand("")
 
@@ -1516,7 +1516,7 @@ class MainApp(main.main):
                     "log_req", {"data": f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n', "id": log_randid})
 
                 self._ocd = subprocess.Popen([getOCDExec(
-                ), "-c", INIT_CMD], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                ), "-c", INIT_CMD], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=os.path.dirname(__file__))
 
                 self._ocdSendCommand("")
 
@@ -2479,6 +2479,11 @@ def getInitCmd(self: MainApp):
             if const._targets[t] in const._force_ir[v]:
                 fixedIR = v
 
+        additinalCFG = ""
+        for v in const._additional_config:
+            if const._targets[t] in const._additional_config[v]:
+                additionalCFG = v
+
         if const._targets[t] in const._dap_required:
             INIT_CMD += const._init_dap.replace("(IR)", str(fixedIR) if fixedIR != 0 else str(self.nIR.Value)).replace(
                 "(XPARAM)", "").replace("(TYPE)", const._targets[t]).replace("(ENDIAN)", "big" if isBig else "little")
@@ -2501,11 +2506,11 @@ def getInitCmd(self: MainApp):
             INIT_CMD += 'proc test_flash {} { flash probe 0; for {set i 0} {$i < 0x04000000} {incr i 0x10000} { set v [flash read_bank_memory 0 $i 0x10000]; echo "Flash read on: 0x[format %X $i]"; }; echo "read is all done"; }; '
 
         elif const._platforms[self.cChipset.Selection]["mode"] == 4:
-            INIT_CMD += f"flash bank target.nor cfi 0x{self.tStart.Value} {hex(int(self.tEnd.Value, 16) - int(self.tStart.Value, 16))} {const._platforms[self.cChipset.Selection]['chip_width']} {const._platforms[self.cChipset.Selection]['bus_width']} target.cpu; "
+            INIT_CMD += f"flash bank target.nor cfi 0x{self.tStart.Value} {hex(int(self.tEnd.Value, 16) - int(self.tStart.Value, 16))} {const._platforms[self.cChipset.Selection]['chip_width']} {const._platforms[self.cChipset.Selection]['bus_width']} target.cpu; flash bank target.dcc ocl 0 0 0 0 target.cpu; "
             INIT_CMD += 'proc test_flash {} { flash probe 0; for {set i 0} {$i < 0x04000000} {incr i 0x10000} { set v [flash read_bank_memory 0 $i 0x10000]; echo "Flash read on: 0x[format %X $i]"; }; echo "read is all done"; }; '
             self._cfi_start_offset = int(self.tStart.Value, 16)
 
-        INIT_CMD += "target.cpu configure -event examine-end { halt; "
+        INIT_CMD += "target.cpu configure -event examine-end { halt; sleep 2000; " + additionalCFG
         if not self.bSkipInit.Value:
             for i in const._platforms[self.cChipset.Selection]["init"]:
                 if i["type"] == 1:

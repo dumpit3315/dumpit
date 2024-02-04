@@ -52,6 +52,17 @@ _force_ir = {
     ],
     5: ["arm11"],
 }
+_additional_config = {
+    "arm7_9 dcc_downloads enable; arm7_9 fast_memory_access enable; ": [
+        "arm7tdmi",
+        "arm9tdmi",
+        "arm920t",
+        "arm720t",
+        "arm966e",
+        "arm946e",
+        "arm926ejs",        
+    ],
+}
 _dap_required = ["cortex_m", "cortex_a", "cortex_r4", "aarch64"]
 _init_normal = "jtag newtap target cpu -irlen (IR)(XPARAM); target create target.cpu (TYPE) -endian (ENDIAN) -chain-position target.cpu; "
 _init_dap = "jtag newtap target cpu -irlen (IR)(XPARAM); dap create target.dap -chain-position target.cpu; target create target.cpu (TYPE) -endian (ENDIAN) -dap target.dap; "
