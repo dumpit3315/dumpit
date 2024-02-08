@@ -30,6 +30,7 @@ import platform
 import intelhex
 import datetime
 import random
+import hashlib
 from controller import qcom_nandregs
 from controller import common_nandregs
 from controller import bcm_nandregs
@@ -2000,6 +2001,9 @@ class MainApp(main.main):
                 self._ocdSendCommand(l)
 
         selPlat = const._platforms[self.cChipset.Selection]
+        
+        cp15 = self.cmd_read_cp15(1, 0, 0, 0)
+        self.cmd_write_cp15(1, 0, 0, 0, cp15 & 0xfffffffe)
 
         try:
             if not self._isInitDone:
@@ -2287,27 +2291,109 @@ class MainApp(main.main):
             CFI_READ_BUFFER = self.nor_read_size
 
             with open(name, "wb") as tempFile:
-                while cOffset < eOffset and not self._isReadCanceled:
-                    if self._loaded_dcc is not None or selPlat["mode"] in [-1, 4]:
-                        tempFile.write(self.cmd_read_flash(
-                            cOffset - self._cfi_start_offset, min(CFI_READ_BUFFER, eOffset - cOffset)))
-                        cOffset += min(CFI_READ_BUFFER, eOffset - cOffset)
+                sOffset = cOffset
 
-                    elif NANDC is not None:
-                        data, spare, bbm = NANDC.read(cOffset >> ((11 if self.cNandSize.Selection == 1 else 9) if selPlat["mode"] != 7 else (
-                            12 if self.cNandSize.Selection == 1 else 11)))
+                if not self.check_identical_reads:                
+                    while cOffset < eOffset and not self._isReadCanceled:
+                        if self._loaded_dcc is not None or selPlat["mode"] in [-1, 4]:
+                            tempFile.write(self.cmd_read_flash(
+                                cOffset - self._cfi_start_offset, min(CFI_READ_BUFFER, eOffset - cOffset)))
+                            cOffset += min(CFI_READ_BUFFER, eOffset - cOffset)
 
-                        tempFile.write(data)
-                        spareBuf += spare
-                        bbBuf += bbm
+                        elif NANDC is not None:
+                            data, spare, bbm = NANDC.read(cOffset >> ((11 if self.cNandSize.Selection == 1 else 9) if selPlat["mode"] != 7 else (
+                                12 if self.cNandSize.Selection == 1 else 11)))
 
-                        cOffset += (0x800 if self.cNandSize.Selection == 1 else 0x200) if selPlat["mode"] != 7 else (
-                            0x1000 if self.cNandSize.Selection == 1 else 0x800)
+                            tempFile.write(data)
+                            spareBuf += spare
+                            bbBuf += bbm
 
-                    else:
-                        raise NotImplementedError()
+                            cOffset += (0x800 if self.cNandSize.Selection == 1 else 0x200) if selPlat["mode"] != 7 else (
+                                0x1000 if self.cNandSize.Selection == 1 else 0x800)
 
-                    self._progMsgQueue.put(cOffset/eOffset)
+                        else:
+                            raise NotImplementedError()
+
+                        self._progMsgQueue.put(cOffset/eOffset)
+
+                else:
+                    if self.identical_check_mode == 0:                        
+                        while cOffset < eOffset and not self._isReadCanceled:
+                            checkTemp = []
+                            checkTempHash = []
+
+                            if self._loaded_dcc is not None or selPlat["mode"] in [-1, 4]:
+                                for _ in range(self.max_read_pass):
+                                    tempData = self.cmd_read_flash(
+                                        cOffset - self._cfi_start_offset, min(CFI_READ_BUFFER, eOffset - cOffset))
+                                    tempHash = hashlib.sha256(tempData).hexdigest()
+                                    
+                                    checkTemp.append(tempData)
+                                    checkTempHash.append(tempHash)
+
+                                    if checkTempHash.count(tempHash) >= self.max_identical_read:
+                                        break
+
+                                tempFile.write(tempData)
+                                cOffset += min(CFI_READ_BUFFER, eOffset - cOffset)
+
+                            elif NANDC is not None:
+                                for _ in range(self.max_read_pass):
+                                    data, spare, bbm = NANDC.read(cOffset >> ((11 if self.cNandSize.Selection == 1 else 9) if selPlat["mode"] != 7 else (
+                                    12 if self.cNandSize.Selection == 1 else 11)))
+
+                                    tempData = data + spare + bbm
+                                    tempHash = hashlib.sha256(tempData).hexdigest()
+
+                                    checkTemp.append(tempData)
+                                    checkTempHash.append(tempHash)
+
+                                    if checkTempHash.count(tempHash) >= self.max_identical_read:
+                                        break
+
+                                tempFile.write(data)
+                                spareBuf += spare
+                                bbBuf += bbm
+
+                                cOffset += (0x800 if self.cNandSize.Selection == 1 else 0x200) if selPlat["mode"] != 7 else (
+                                    0x1000 if self.cNandSize.Selection == 1 else 0x800)
+
+                            else:
+                                raise NotImplementedError()
+
+                            self._progMsgQueue.put(cOffset/eOffset)
+
+                    elif self.identical_check_mode == 1:
+                        raise NotImplementedError("TODO")
+
+                        for _ in range(self.max_identical_read):
+                            if self._isReadCanceled: break
+
+                            spareBuf.clear()
+                            bbBuf.clear()
+                            cOffset = sOffset                            
+
+                            while cOffset < eOffset and not self._isReadCanceled:
+                                if self._loaded_dcc is not None or selPlat["mode"] in [-1, 4]:
+                                    tempFile.write(self.cmd_read_flash(
+                                        cOffset - self._cfi_start_offset, min(CFI_READ_BUFFER, eOffset - cOffset)))
+                                    cOffset += min(CFI_READ_BUFFER, eOffset - cOffset)
+
+                                elif NANDC is not None:
+                                    data, spare, bbm = NANDC.read(cOffset >> ((11 if self.cNandSize.Selection == 1 else 9) if selPlat["mode"] != 7 else (
+                                        12 if self.cNandSize.Selection == 1 else 11)))
+
+                                    tempFile.write(data)
+                                    spareBuf += spare
+                                    bbBuf += bbm
+
+                                    cOffset += (0x800 if self.cNandSize.Selection == 1 else 0x200) if selPlat["mode"] != 7 else (
+                                        0x1000 if self.cNandSize.Selection == 1 else 0x800)
+
+                                else:
+                                    raise NotImplementedError()
+
+                                self._progMsgQueue.put(cOffset/eOffset)
 
                 tempFile.write(spareBuf + bbBuf)
                 self._logThreadQueue.put(
@@ -2836,10 +2922,11 @@ def getInitCmd(self: MainApp):
                 fixedIR = v
 
         additinalCFG = ""
-        for v in const._additional_config:
-            if const._targets[t] in const._additional_config[v]:
-                additionalCFG = v + "; "
-                break
+        if not self.disable_platform_options:
+            for v in const._additional_config:
+                if const._targets[t] in const._additional_config[v]:
+                    additionalCFG = v + "; "
+                    break
 
         if const._targets[t] in const._dap_required:
             INIT_CMD += const._init_dap.replace("(IR)", str(fixedIR) if fixedIR != 0 else str(self.nIR.Value)).replace(
