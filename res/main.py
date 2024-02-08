@@ -52,8 +52,11 @@ class main ( wx.Frame ):
 
 		bSizer6.Add( self.lSpeed, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
-		self.nSpeed = wx.SpinCtrl( self.dPage1, wx.ID_ANY, u"1000", wx.DefaultPosition, wx.DefaultSize, wx.SP_ARROW_KEYS, 0, 30000, 1000 )
+		self.nSpeed = wx.SpinCtrl( self.dPage1, wx.ID_ANY, u"1000", wx.DefaultPosition, wx.DefaultSize, wx.SP_ARROW_KEYS|wx.TE_PROCESS_ENTER, 0, 30000, 1000 )
 		bSizer6.Add( self.nSpeed, 1, wx.ALL, 5 )
+
+		self.bConfigureRead = wx.Button( self.dPage1, wx.ID_ANY, u"Target Read Settings", wx.DefaultPosition, wx.DefaultSize, 0 )
+		bSizer6.Add( self.bConfigureRead, 0, wx.ALL, 5 )
 
 
 		bSizer5.Add( bSizer6, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.EXPAND, 5 )
@@ -70,7 +73,7 @@ class main ( wx.Frame ):
 		self.cChipset.SetSelection( 0 )
 		self.cChipset.SetMaxSize( wx.Size( 150,-1 ) )
 
-		bSizer61.Add( self.cChipset, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+		bSizer61.Add( self.cChipset, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL|wx.EXPAND, 5 )
 
 		self.lTarget = wx.StaticText( self.dPage1, wx.ID_ANY, u"Target:", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.lTarget.Wrap( -1 )
@@ -106,7 +109,7 @@ class main ( wx.Frame ):
 		bSizer61.Add( self.nIR, 0, wx.ALL, 5 )
 
 
-		bSizer5.Add( bSizer61, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
+		bSizer5.Add( bSizer61, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.EXPAND, 5 )
 
 		bSizer611 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -618,6 +621,9 @@ class main ( wx.Frame ):
 		self.Bind( wx.EVT_CLOSE, self.doQuit )
 		self.Bind( wx.EVT_IDLE, self.doLoop )
 		self.tab.Bind( wx.EVT_NOTEBOOK_PAGE_CHANGING, self.loadNoteBook )
+		self.nSpeed.Bind( wx.EVT_TEXT_ENTER, self.doProcessSpeedEntry )
+		self.bConfigureRead.Bind( wx.EVT_BUTTON, self.doConfigureRead )
+		self.cResetMode.Bind( wx.EVT_CHOICE, self.doProcessResetMode )
 		self.bResetDelay.Bind( wx.EVT_BUTTON, self.bDoConfigureReset )
 		self.tStart.Bind( wx.EVT_TEXT, self.doHexCheck )
 		self.tEnd.Bind( wx.EVT_TEXT, self.doHexCheck )
@@ -638,6 +644,7 @@ class main ( wx.Frame ):
 		self.bEnableMMU.Bind( wx.EVT_BUTTON, self.doEnableMMU )
 		self.bDisableMMU.Bind( wx.EVT_BUTTON, self.doDisableMMU )
 		self.bExec.Bind( wx.EVT_BUTTON, self.doExecAddress )
+		self.tOCDCmd.Bind( wx.EVT_KEY_DOWN, self.doProcessCmdArrow )
 		self.tOCDCmd.Bind( wx.EVT_TEXT_ENTER, self.doOCDCmdExec )
 		self.bConfigureLayoutFT232R.Bind( wx.EVT_BUTTON, self.doOpenFT232RConfig )
 		self.bConfigureLayoutGPIOD.Bind( wx.EVT_BUTTON, self.doOpenGPIODConfig )
@@ -660,6 +667,15 @@ class main ( wx.Frame ):
 		event.Skip()
 
 	def loadNoteBook( self, event ):
+		event.Skip()
+
+	def doProcessSpeedEntry( self, event ):
+		event.Skip()
+
+	def doConfigureRead( self, event ):
+		event.Skip()
+
+	def doProcessResetMode( self, event ):
 		event.Skip()
 
 	def bDoConfigureReset( self, event ):
@@ -718,6 +734,9 @@ class main ( wx.Frame ):
 		event.Skip()
 
 	def doExecAddress( self, event ):
+		event.Skip()
+
+	def doProcessCmdArrow( self, event ):
 		event.Skip()
 
 	def doOCDCmdExec( self, event ):

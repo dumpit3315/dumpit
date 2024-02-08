@@ -1,4 +1,4 @@
-DUMPIT_VERSION = "0.9"
+DUMPIT_VERSION = "0.91"
 
 _interfaces = [
     (
@@ -53,7 +53,18 @@ _force_ir = {
     5: ["arm11"],
 }
 _additional_config = {
-    "arm7_9 dcc_downloads enable; arm7_9 fast_memory_access enable; ": [
+    "arm7_9 dcc_downloads enable; arm7_9 fast_memory_access enable; arm7_9 additional_nop enable": [
+        "arm7tdmi",
+        "arm9tdmi",
+        "arm920t",
+        "arm720t",
+        "arm966e",
+        "arm946e",
+        "arm926ejs",        
+    ],
+}
+_additional_config_unset = {
+    "arm7_9 dcc_downloads disable; arm7_9 fast_memory_access disable; arm7_9 additional_nop disable": [
         "arm7tdmi",
         "arm9tdmi",
         "arm920t",
@@ -622,7 +633,12 @@ _platforms_b = _platforms_b = [
         "mode": 3,
         "flash_regs": 0x60008000,
         "init": [],
-    },        
+    },
+    {
+        "name": "BCM2133",
+        "mode": 8,        
+        "init": [],
+    },
 ]
 
 # 0xf9800000

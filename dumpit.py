@@ -8,6 +8,7 @@ from res import ft232h_pinconfig
 from res import resetDelay
 from res import nandControlConfig
 from res import nandInitScript
+from res import targetReadConfig
 import os
 import sys
 import const
@@ -31,6 +32,7 @@ import datetime
 import random
 from controller import qcom_nandregs
 from controller import common_nandregs
+from controller import bcm_nandregs
 
 os.environ["WXSUPPRESS_SIZER_FLAGS_CHECK"] = "1"
 _PTRACKING = queue.Queue()
@@ -300,11 +302,11 @@ class ForwardApp(forwardDialog.forwardDialog):
 
                 self.lPin.Show(False)
                 self.tPin.Show(False)
-                
+
                 self.lConnect.Show()
-                
+
                 self.Layout()
-                
+
                 self.pConnectTimeout.StartOnce(15000)
 
             elif q[1] == "bye":
@@ -322,14 +324,15 @@ class ForwardApp(forwardDialog.forwardDialog):
         except Exception:
             pass
         self._ws_parent._sio.disconnect()
-        
+
         if not self._loop_running:
-            self._ws_parent._doAnalytics("disconnect", reason=1)            
+            self._ws_parent._doAnalytics("disconnect", reason=1)
             return self.EndModal(0)
 
     def doConnect(self, event):
+        self.pConnectTimeout.Stop()
         return self.EndModal(1)
-    
+
     def doConnectTimeout(self, event):
         return self.EndModal(1)
 
@@ -604,6 +607,13 @@ class ResetConfig(resetDelay.ResetDelayConfig):
         self.base_parent.nsrst_reset_delay = self.nSRSTDelay.Value
         self.base_parent.reset_delay = self.nResetDelay.Value
         self.base_parent.custom_reset = self.cUseCustom.Value
+        if not self.cUseCustom.Value:
+            self.base_parent._ocdSendCommand(
+                f"jtag_ntrst_delay 0; adapter srst delay 0; jtag_ntrst_assert_width 0; adapter srst pulse_width 0")
+
+        else:
+            self.base_parent._ocdSendCommand(
+                f"jtag_ntrst_delay {self.base_parent.ntrst_reset_delay}; adapter srst delay {self.base_parent.nsrst_reset_delay}; jtag_ntrst_assert_width {self.base_parent.ntrst_reset_pulse}; adapter srst pulse_width {self.base_parent.nsrst_reset_pulse}")
         self.EndModal(0)
 
     def bDoCancel(self, event):
@@ -622,7 +632,7 @@ class NANDControllerConfig(nandControlConfig.NANDControllerConfig):
         self.tCustomCFG1.Value = f"{self.base_parent.custom_cfg1:02x}"
         self.tCustomCFG2.Value = f"{self.base_parent.custom_cfg2:02x}"
         self.tCustomCFGCMN.Value = f"{self.base_parent.custom_cfg_common:02x}"
-        
+
         self.init_code = self.base_parent.nand_init_code
 
     def doApply(self, event):
@@ -633,28 +643,83 @@ class NANDControllerConfig(nandControlConfig.NANDControllerConfig):
         self.base_parent.custom_cfg1 = int(self.tCustomCFG1.Value, 16)
         self.base_parent.custom_cfg2 = int(self.tCustomCFG2.Value, 16)
         self.base_parent.custom_cfg_common = int(self.tCustomCFGCMN.Value, 16)
-        
+
         self.base_parent.nand_init_code = self.init_code
         self.EndModal(0)
 
     def doCancel(self, event):
         self.EndModal(0)
-        
+
     def doCodeEdit(self, event):
         InitCodeEditor(self).ShowModal()
+
+
+class TargetReadConfig(targetReadConfig.TargetReadConfig):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.base_parent: MainApp = parent
+
+        self.sReadSize.Value = self.base_parent.nor_read_size // 0x100
+        self.tReadSize.Label = f"{self.sReadSize.Value*0x100} bytes"
+
+        self.sMaxPass.Value = self.base_parent.max_read_pass
+        self.sMaxIdentical.Value = self.base_parent.max_identical_read
+        self.bCheckIdentical.Value = self.base_parent.check_identical_reads
+        self.bDisablePerformanceOpts.Value = self.base_parent.disable_platform_options
+        self.cIdenticalMode.Selection = self.base_parent.identical_check_mode
+
+    def doChangeReadSize(self, event):
+        self.tReadSize.Label = f"{self.sReadSize.Value*0x100} bytes"
+        self.Layout()
+
+    def doApply(self, event):
+        self.base_parent.nor_read_size = self.sReadSize.Value * 0x100
+        self.base_parent.max_read_pass = self.sMaxPass.Value
+        self.base_parent.max_identical_read = self.sMaxIdentical.Value
+        self.base_parent.check_identical_reads = self.bCheckIdentical.Value
+        self.base_parent.disable_platform_options = self.bDisablePerformanceOpts.Value
+        self.base_parent.identical_check_mode = self.cIdenticalMode.Selection
+
+        t = self.base_parent.cTarget.Selection
+        isBig = False
+
+        if t >= self.base_parent._beTarget:
+            isBig = True
+            t -= self.base_parent._beTarget
+
+        else:
+            t -= 1
+
+        if not self.bDisablePerformanceOpts.Value:
+            for v in const._additional_config:
+                if const._targets[t] in const._additional_config[v]:
+                    self.base_parent._ocdSendCommand(v)
+                    break
+
+        else:
+            for v in const._additional_config_unset:
+                if const._targets[t] in const._additional_config_unset[v]:
+                    self.base_parent._ocdSendCommand(v)
+                    break
+
+        self.EndModal(0)
+
+    def doCancel(self, event):
+        self.EndModal(0)
+
 
 class InitCodeEditor(nandInitScript.NANDCodeEdit):
     def __init__(self, parent):
         super().__init__(parent)
         self.base_parent: NANDControllerConfig = parent
-        
+
         self.tTCLCode.SetLexer(wx.stc.STC_LEX_TCL)
         self.tTCLCode.Value = self.base_parent.init_code
-        
+
     def doApply(self, event):
         self.base_parent.init_code = self.tTCLCode.Value
         self.EndModal(0)
-        
+
     def doCancel(self, event):
         self.EndModal(0)
 
@@ -738,11 +803,15 @@ class MainApp(main.main):
         self._sioThread = None
         self._sioMsgQueue = None
 
+        self._sioLogThread = None
+
         self._errMsgQueue = None
         self._progMsgQueue = None
         self._btnMsgQueue = None
         self._pong_flag = threading.Event()
         self._timeout_flag = threading.Event()
+
+        self.log_time = 0
 
         self._next_ping = 0
         self._next_timeout = 0
@@ -750,6 +819,7 @@ class MainApp(main.main):
 
         self._reconnecting = False
         self._logPushBuff = []
+        self._logPushDelay = queue.Queue()
 
         self._dumpThread = None
 
@@ -810,10 +880,20 @@ class MainApp(main.main):
         self.custom_cfg1 = -1
         self.custom_cfg2 = -1
         self.custom_cfg_common = -1
-        
+
         self.nand_init_code = ""
 
         self._isInitDone = False
+
+        self.nor_read_size = 512
+        self.max_read_pass = 10
+        self.max_identical_read = 3
+        self.check_identical_reads = True
+        self.disable_platform_options = False
+        self.identical_check_mode = 0
+
+        self._command_history = []
+        self._command_history_index = 0
 
         self._nand_idcodes = json.load(
             open(os.path.join(os.path.dirname(__file__), "nand_ids.json"), "r"))
@@ -821,82 +901,149 @@ class MainApp(main.main):
         if os.path.exists(os.path.join(os.path.dirname(__file__), "dumpit_config.json")):
             cfg = json.load(
                 open(os.path.join(os.path.dirname(__file__), "dumpit_config.json"), "r"))
-            self.cInterface.Selection = cfg["interface"]
-            self.nSpeed.Value = cfg["speed"]
-            self.cChipset.Selection = cfg["chipset"]
-            self.cTarget.Selection = cfg["target"]
-            self.cTap.Selection = cfg["tap"]
-            self.nIR.Value = cfg["ir"]
-            self.cResetMode.Selection = cfg["reset_mode"]
-            self.ntrst_reset_pulse = cfg["trst_reset_pulse"]
-            self.nsrst_reset_pulse = cfg["srst_reset_pulse"]
-            self.ntrst_reset_delay = cfg["trst_reset_delay"]
-            self.nsrst_reset_delay = cfg["srst_reset_delay"]
-            self.reset_delay = cfg["reset_delay"]
-            self.custom_reset = cfg["custom_reset"]
-            self.bSkipInit.Value = cfg["skip_init"]
-            self.tStart.Value = cfg["start"]
-            self.tEnd.Value = cfg["end"]
-            self.cNandSize.Selection = cfg["nand_size"]
-            self.bECCDisable.Value = cfg["ecc_disabled"]
-            self.bBadBlockinData.Value = cfg["bad_blocks_in_data"]
-            self.bTargetRemote.Value = cfg["target_remote"]
-            self.bUseGDB.Value = cfg["use_gdb"]
+            if "interface" in cfg:
+                self.cInterface.Selection = cfg["interface"]
+            if "speed" in cfg:
+                self.nSpeed.Value = cfg["speed"]
+            if "chipset" in cfg:
+                self.cChipset.Selection = cfg["chipset"]
+            if "target" in cfg:
+                self.cTarget.Selection = cfg["target"]
+            if "tap" in cfg:
+                self.cTap.Selection = cfg["tap"]
+            if "ir" in cfg:
+                self.nIR.Value = cfg["ir"]
+            if "reset_mode" in cfg:
+                self.cResetMode.Selection = cfg["reset_mode"]
+            if "trst_reset_pulse" in cfg:
+                self.ntrst_reset_pulse = cfg["trst_reset_pulse"]
+            if "srst_reset_pulse" in cfg:
+                self.nsrst_reset_pulse = cfg["srst_reset_pulse"]
+            if "trst_reset_delay" in cfg:
+                self.ntrst_reset_delay = cfg["trst_reset_delay"]
+            if "srst_reset_delay" in cfg:
+                self.nsrst_reset_delay = cfg["srst_reset_delay"]
+            if "reset_delay" in cfg:
+                self.reset_delay = cfg["reset_delay"]
+            if "custom_reset" in cfg:
+                self.custom_reset = cfg["custom_reset"]
+            if "skip_init" in cfg:
+                self.bSkipInit.Value = cfg["skip_init"]
+            if "start" in cfg:
+                self.tStart.Value = cfg["start"]
+            if "end" in cfg:
+                self.tEnd.Value = cfg["end"]
+            if "nand_size" in cfg:
+                self.cNandSize.Selection = cfg["nand_size"]
+            if "ecc_disabled" in cfg:
+                self.bECCDisable.Value = cfg["ecc_disabled"]
+            if "bad_blocks_in_data" in cfg:
+                self.bBadBlockinData.Value = cfg["bad_blocks_in_data"]
+            if "target_remote" in cfg:
+                self.bTargetRemote.Value = cfg["target_remote"]
+            if "use_gdb" in cfg:
+                self.bUseGDB.Value = cfg["use_gdb"]
+            if "ft232r_usb_id" in cfg:
+                self.tUSBID.Value = cfg["ft232r_usb_id"]
+            if "ft232r_restore_serial" in cfg:
+                self.tRestoreSerial.Value = cfg["ft232r_restore_serial"]
+            if "ft232r_tdi" in cfg:
+                self._ft232r_tdi = cfg["ft232r_tdi"]
+            if "ft232r_tdo" in cfg:
+                self._ft232r_tdo = cfg["ft232r_tdo"]
+            if "ft232r_tms" in cfg:
+                self._ft232r_tck = cfg["ft232r_tms"]
+            if "ft232r_tck" in cfg:
+                self._ft232r_tms = cfg["ft232r_tck"]
+            if "ft232r_trst" in cfg:
+                self._ft232r_trst = cfg["ft232r_trst"]
+            if "ft232r_srst" in cfg:
+                self._ft232r_srst = cfg["ft232r_srst"]
+            if "ft232h_adapter" in cfg:
+                self.cFTAdapter.Selection = cfg["ft232h_adapter"]
+            if "ft232h_usb_id" in cfg:
+                self.tUSBID1.Value = cfg["ft232h_usb_id"]
+            if "ft232h_channel" in cfg:
+                self.cChannel.Selection = cfg["ft232h_channel"]
+            if "ft232h_sampling_edge" in cfg:
+                self.rSamplingEdge.Selection = cfg["ft232h_sampling_edge"]
+            if "ft232h_tdi" in cfg:
+                self._ft232h_tdi = cfg["ft232h_tdi"]
+            if "ft232h_tdo" in cfg:
+                self._ft232h_tdo = cfg["ft232h_tdo"]
+            if "ft232h_tck" in cfg:
+                self._ft232h_tck = cfg["ft232h_tck"]
+            if "ft232h_tms" in cfg:
+                self._ft232h_tms = cfg["ft232h_tms"]
+            if "ft232h_trst" in cfg:
+                self._ft232h_trst = cfg["ft232h_trst"]
+            if "ft232h_srst" in cfg:
+                self._ft232h_srst = cfg["ft232h_srst"]
 
-            self.tUSBID.Value = cfg["ft232r_usb_id"]
-            self.tRestoreSerial.Value = cfg["ft232r_restore_serial"]
-            self._ft232r_tdi = cfg["ft232r_tdi"]
-            self._ft232r_tdo = cfg["ft232r_tdo"]
-            self._ft232r_tck = cfg["ft232r_tms"]
-            self._ft232r_tms = cfg["ft232r_tck"]
-            self._ft232r_trst = cfg["ft232r_trst"]
-            self._ft232r_srst = cfg["ft232r_srst"]
+            if "ft232h_pins" in cfg:
+                self._ft232h_pins = (cfg["ft232h_pins"] & ~(1 << self._ft232h_tdi | 1 << self._ft232h_tdo | 1 <<
+                                                            self._ft232h_tck)) | 1 << self._ft232h_tms | 1 << self._ft232h_trst | 1 << self._ft232h_srst
+                self._ft232h_dirs = 0xffff & ~(1 << self._ft232h_tdo)
 
-            self.cFTAdapter.Selection = cfg["ft232h_adapter"]
-            self.tUSBID1.Value = cfg["ft232h_usb_id"]
-            self.cChannel.Selection = cfg["ft232h_channel"]
-            self.rSamplingEdge.Selection = cfg["ft232h_sampling_edge"]
-            self._ft232h_tdi = cfg["ft232h_tdi"]
-            self._ft232h_tdo = cfg["ft232h_tdo"]
-            self._ft232h_tck = cfg["ft232h_tck"]
-            self._ft232h_tms = cfg["ft232h_tms"]
-            self._ft232h_trst = cfg["ft232h_trst"]
-            self._ft232h_srst = cfg["ft232h_srst"]
+            if "gpio_chip" in cfg:
+                self.nGPIODChip.Value = cfg["gpio_chip"]
+            if "gpio_tdi" in cfg:
+                self._gpio_tdi = cfg["gpio_tdi"]
+            if "gpio_tdo" in cfg:
+                self._gpio_tdo = cfg["gpio_tdo"]
+            if "gpio_tck" in cfg:
+                self._gpio_tck = cfg["gpio_tck"]
+            if "gpio_tms" in cfg:
+                self._gpio_tms = cfg["gpio_tms"]
+            if "gpio_trst" in cfg:
+                self._gpio_trst = cfg["gpio_trst"]
+            if "gpio_srst" in cfg:
+                self._gpio_srst = cfg["gpio_srst"]
+            if "parport_cable" in cfg:
+                self.cParCable.Selection = cfg["parport_cable"]
+            if "parport_port" in cfg:
+                self.tParPort.Value = cfg["parport_port"]
+            if "remote_bitbang_host" in cfg:
+                self.tRBBHost.Value = cfg["remote_bitbang_host"]
+            if "remote_bitbang_port" in cfg:
+                self.tRBBPort.Value = cfg["remote_bitbang_port"]
+            if "finder_use_mpsse" in cfg:
+                self.bUseMPSSE.Value = cfg["finder_use_mpsse"]
+            if "enable_analytics" in cfg:
+                self.bEnableAnalytics.Value = cfg["enable_analytics"]
+            if "user_id" in cfg:
+                self.tUserID.Value = cfg["user_id"]
+            if "tracking_count" in cfg:
+                _PTRACKCOUNT = cfg["tracking_count"]
+            if "debug_log" in cfg:
+                self._debug_logs = cfg["debug_log"]
+            if "nand_skip_init" in cfg:
+                self.skip_init = cfg["nand_skip_init"]
+            if "nand_skip_init_gpio" in cfg:
+                self.skip_gpio_init = cfg["nand_skip_init_gpio"]
+            if "nand_custom_cfg1" in cfg:
+                self.custom_cfg1 = cfg["nand_custom_cfg1"]
+            if "nand_custom_cfg2" in cfg:
+                self.custom_cfg2 = cfg["nand_custom_cfg2"]
+            if "nand_custom_cfg_common" in cfg:
+                self.custom_cfg_common = cfg["nand_custom_cfg_common"]
+            if "nand_page_width" in cfg:
+                self.page_width = cfg["nand_page_width"]
+            if "nand_init_code" in cfg:
+                self.nand_init_code = cfg["nand_init_code"]
 
-            self._ft232h_pins = (cfg["ft232h_pins"] & ~(1 << self._ft232h_tdi | 1 << self._ft232h_tdo | 1 <<
-                                 self._ft232h_tck)) | 1 << self._ft232h_tms | 1 << self._ft232h_trst | 1 << self._ft232h_srst
-            self._ft232h_dirs = 0xffff & ~(1 << self._ft232h_tdo)
-
-            self.nGPIODChip.Value = cfg["gpio_chip"]
-            self._gpio_tdi = cfg["gpio_tdi"]
-            self._gpio_tdo = cfg["gpio_tdo"]
-            self._gpio_tck = cfg["gpio_tck"]
-            self._gpio_tms = cfg["gpio_tms"]
-            self._gpio_trst = cfg["gpio_trst"]
-            self._gpio_srst = cfg["gpio_srst"]
-
-            self.cParCable.Selection = cfg["parport_cable"]
-            self.tParPort.Value = cfg["parport_port"]
-
-            self.tRBBHost.Value = cfg["remote_bitbang_host"]
-            self.tRBBPort.Value = cfg["remote_bitbang_port"]
-
-            self.bUseMPSSE.Value = cfg["finder_use_mpsse"]
-
-            self.bEnableAnalytics.Value = cfg["enable_analytics"]
-            self.tUserID.Value = cfg["user_id"]
-
-            _PTRACKCOUNT = cfg["tracking_count"]
-            self._debug_logs = cfg["debug_log"]
-
-            self.skip_init = cfg["nand_skip_init"]
-            self.skip_gpio_init = cfg["nand_skip_init_gpio"]
-            self.custom_cfg1 = cfg["nand_custom_cfg1"]
-            self.custom_cfg2 = cfg["nand_custom_cfg2"]
-            self.custom_cfg_common = cfg["nand_custom_cfg_common"]
-            self.page_width = cfg["nand_page_width"]
-            
-            self.nand_init_code = cfg["nand_init_code"]
+            if "read_size" in cfg:
+                self.nor_read_size = cfg["read_size"]
+            if "max_read_pass" in cfg:
+                self.max_read_pass = cfg["max_read_pass"]
+            if "max_identical" in cfg:
+                self.max_identical_read = cfg["max_identical"]
+            if "check_identical" in cfg:
+                self.check_identical_reads = cfg["check_identical"]
+            if "disable_platform_options" in cfg:
+                self.disable_platform_options = cfg["disable_platform_options"]
+            if "identical_check_mode" in cfg:
+                self.identical_check_mode = cfg["identical_check_mode"]
 
         if not self.tUserID.Value:
             self.tUserID.Value = str(uuid.uuid4())
@@ -976,8 +1123,15 @@ class MainApp(main.main):
             cfg["nand_custom_cfg2"] = self.custom_cfg2
             cfg["nand_custom_cfg_common"] = self.custom_cfg_common
             cfg["nand_page_width"] = self.page_width
-            
+
             cfg["nand_init_code"] = self.nand_init_code
+
+            cfg["read_size"] = self.nor_read_size
+            cfg["max_read_pass"] = self.max_read_pass
+            cfg["max_identical"] = self.max_identical_read
+            cfg["check_identical"] = self.check_identical_reads
+            cfg["disable_platform_options"] = self.disable_platform_options
+            cfg["identical_check_mode"] = self.identical_check_mode
 
             cfg["dcc_used"] = self._loaded_dcc is not None
 
@@ -995,8 +1149,8 @@ class MainApp(main.main):
                     if self._isForward:
                         log_randid = random.randbytes(16).hex()
                         self._logPushBuff.append((l, log_randid))
-                        self._sio.emit(
-                            "log_req", {"data": l.decode("utf-8"), "id": log_randid})
+                        self._logPushDelay.put(
+                            {"data": l.decode("utf-8"), "id": log_randid})
 
             except Exception:
                 pass
@@ -1020,6 +1174,30 @@ class MainApp(main.main):
                             if self._debug_logs:
                                 print("init undone received")
                             self._isInitDone = False
+
+                        elif p[1]["c"] == "progress":
+                            self.progress.Value = p[1]["d"]
+
+                        elif p[1]["c"] == "isRead":
+                            if p[1]["d"]:
+                                self._isRead = True
+                                self._isReadCanceled = False
+                                self._btnMsgQueue.put(True)
+                            else:
+                                self._btnMsgQueue.put(False)
+                                self._isRead = False
+                                self._isReadCanceled = False
+
+                        elif p[1]["c"] == "isSupressed":
+                            self._logSupressed = p[1]["d"]
+
+                        elif p[1]["c"] == "doStopRead":
+                            self._isReadCanceled = True
+
+                        elif p[1]["c"] == "configure":
+                            self._cfi_start_offset = p[1]["d"]["cfi_base_offset"]
+                            self.cChipset.Selection = p[1]["d"]["chipset"]
+                            self.cTarget.Selection = p[1]["d"]["target"]
 
                     elif p[0] == "log" and (not self._logSupressed or p[1].startswith(b"Error:")):
                         self._logThreadQueue.put(p[1])
@@ -1070,6 +1248,25 @@ class MainApp(main.main):
                                 print("init undone received")
                             self._isInitDone = False
 
+                        elif p[1]["c"] == "progress":
+                            self.progress.Value = p[1]["d"]
+
+                        elif p[1]["c"] == "isRead":
+                            if p[1]["d"]:
+                                self._isRead = True
+                                self._isReadCanceled = False
+                                self._btnMsgQueue.put(True)
+                            else:
+                                self._btnMsgQueue.put(False)
+                                self._isRead = False
+                                self._isReadCanceled = False
+
+                        elif p[1]["c"] == "isSupressed":
+                            self._logSupressed = p[1]["d"]
+
+                        elif p[1]["c"] == "doStopRead":
+                            self._isReadCanceled = True
+
                     elif p[0] == "bye":
                         # print("bye event")
                         self._sio.disconnect()
@@ -1088,6 +1285,7 @@ class MainApp(main.main):
                             self._reconnect_token = res["reconnect_token"]
 
                             for l, id in self._logPushBuff:
+                                time.sleep(0.1)
                                 self._sio.emit(
                                     "log_req", {"data": l.decode("utf-8"), "id": id})
 
@@ -1105,6 +1303,18 @@ class MainApp(main.main):
 
                 except Exception:
                     pass
+
+    def _doWSLoop_Forward_Log(self):
+        while (self._ocd.poll() is None and self._sio.connected) or self._reconnecting:
+            if not self._reconnecting:
+                if time.perf_counter() >= self.log_time:
+                    self.log_time = time.perf_counter() + 0.1
+                    try:
+                        self._sio.emit(
+                            "log_req", self._logPushDelay.get_nowait())
+
+                    except queue.Empty:
+                        pass
 
     def doLoop(self, event):
         global _PTRACKCOUNT
@@ -1145,6 +1355,9 @@ class MainApp(main.main):
                 p = self._progMsgQueue.get_nowait()
                 self.progress.Value = min(
                     self.progress.Range, int(p * self.progress.Range))
+                if self._isConnectRemote and self._sio:
+                    self._sio.emit(
+                        "command", {"c": "progress", "d": int(p * self.progress.Range)})
 
             except queue.Empty:
                 pass
@@ -1352,6 +1565,7 @@ class MainApp(main.main):
 
             if self._isForward:
                 for l, id in self._logPushBuff:
+                    time.sleep(0.1)
                     self._sio.emit(
                         "log_req", {"data": l.decode("utf-8"), "id": id})
 
@@ -1432,6 +1646,8 @@ class MainApp(main.main):
             self._timeout_flag.clear()
             self._logPushBuff.clear()
 
+            self._logPushDelay = queue.Queue()
+
             self._sioThread = threading.Thread(target=self._doWSLoop)
             self._sioThread.daemon = True
 
@@ -1506,12 +1722,15 @@ class MainApp(main.main):
                 self._isForward = True
                 self._isConnectRemote = True
 
+                self.log_time = time.perf_counter() + 0.1
+
                 self.status.Value = f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n'
 
                 log_randid = random.randbytes(16).hex()
                 self._logPushBuff.append(
                     (f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n'.encode("utf-8"), log_randid))
 
+                time.sleep(0.1)
                 self._sio.emit(
                     "log_req", {"data": f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n', "id": log_randid})
 
@@ -1519,6 +1738,9 @@ class MainApp(main.main):
                 ), "-c", INIT_CMD], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=os.path.dirname(__file__))
 
                 self._ocdSendCommand("")
+
+                self._sio.emit("command", {"c": "configure", "d": {
+                               "cfi_base_offset": self._cfi_start_offset, "chipset": self.cChipset.Selection, "target": self.cTarget.Selection}})
 
                 self._logThreadQueue = queue.Queue()
                 self._sioMsgQueue = queue.Queue()
@@ -1531,14 +1753,22 @@ class MainApp(main.main):
                 self._timeout_flag.clear()
                 self._logPushBuff.clear()
 
+                self._logPushDelay = queue.Queue()
+
                 self._logThread = threading.Thread(target=self._doLogging)
                 self._logThread.daemon = True
 
                 self._sioThread = threading.Thread(
                     target=self._doWSLoop_Forward)
+                self._sioThread.daemon = True
+
+                self._sioLogThread = threading.Thread(
+                    target=self._doWSLoop_Forward_Log)
+                self._sioLogThread.daemon = True
 
                 self._logThread.start()
                 self._sioThread.start()
+                self._sioLogThread.start()
 
                 self.bConnect.Label = "Disconnect"
                 self.bConnectRemote.Enable(False)
@@ -1675,6 +1905,9 @@ class MainApp(main.main):
         self._isReadCanceled = False
 
         self._btnMsgQueue.put(True)
+        if self._isConnectRemote and self._sio:
+            self._sio.emit("command", {"c": "isRead", "d": True})
+
         self._doAnalytics("dump_start", addr_start=cOffset,
                           addr_end=eOffset, is_memory=True)
 
@@ -1684,7 +1917,10 @@ class MainApp(main.main):
         self._logThreadQueue.put(
             f"Dump memory started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
 
-        CFI_READ_BUFFER = 0x10000
+        if self._isConnectRemote and self._sio:
+            self._sio.emit("command", {"c": "isSupressed", "d": True})
+
+        CFI_READ_BUFFER = self.nor_read_size
 
         try:
             with open(name, "wb") as tempFile:
@@ -1709,7 +1945,11 @@ class MainApp(main.main):
             self._btnMsgQueue.put(False)
             self._isRead = False
             self._isReadCanceled = False
+            if self._isConnectRemote and self._sio:
+                self._sio.emit("command", {"c": "isRead", "d": False})
             self._logSupressed = False
+            if self._isConnectRemote and self._sio:
+                self._sio.emit("command", {"c": "isSupressed", "d": False})
 
             self._doAnalytics("dump_end", addr_start=cOffset,
                               addr_end=eOffset, is_memory=True)
@@ -1728,6 +1968,8 @@ class MainApp(main.main):
             fd: wx.FileDialog
             if fd.ShowModal() != wx.ID_CANCEL:
                 self.progress.Value = 0
+                if self._isConnectRemote and self._sio:
+                    self._sio.emit("command", {"c": "progress", "d": 0})
 
                 self._dumpThread = threading.Thread(
                     target=self.doReadMemoryThread, args=(fd.GetPath(), cOffset, eOffset))
@@ -1742,6 +1984,9 @@ class MainApp(main.main):
         self._isRead = True
         self._isReadCanceled = False
 
+        if self._isConnectRemote and self._sio:
+            self._sio.emit("command", {"c": "isRead", "d": True})
+
         NANDC = None
 
         self._btnMsgQueue.put(True)
@@ -1749,7 +1994,7 @@ class MainApp(main.main):
                           addr_end=eOffset, is_memory=False)
 
         self._ocdSendCommand("halt")
-        
+
         if self.nand_init_code:
             for l in self.nand_init_code.splitlines():
                 self._ocdSendCommand(l)
@@ -1759,6 +2004,8 @@ class MainApp(main.main):
         try:
             if not self._isInitDone:
                 if self._loaded_dcc is not None:
+                    self._cfi_start_offset = 0
+
                     self._ocdSendCommand("soft_reset_halt")
                     self._ocdSendCommand(f"load_image $_DCC_PATH", False)
                     self._ocdSendCommand("arm core_state arm")
@@ -1829,7 +2076,7 @@ class MainApp(main.main):
                         NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
 
                         self._logThreadQueue.put(
-                            f'Page size: {NAND_INFO["page_size"]}')
+                            f'Page size: {NAND_INFO["page_size"] if not NAND_INFO["is_extended"] else (1024 << (NANDC._idcode & 0x3))}')
                         self._logThreadQueue.put(
                             f'Spare size: {NAND_INFO["spare_size"]}')
                         self._logThreadQueue.put(
@@ -1870,7 +2117,7 @@ class MainApp(main.main):
                         NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
 
                         self._logThreadQueue.put(
-                            f'Page size: {NAND_INFO["page_size"]}')
+                            f'Page size: {NAND_INFO["page_size"] if not NAND_INFO["is_extended"] else (1024 << (NANDC._idcode & 0x3))}')
                         self._logThreadQueue.put(
                             f'Spare size: {NAND_INFO["spare_size"]}')
                         self._logThreadQueue.put(
@@ -1891,8 +2138,7 @@ class MainApp(main.main):
                     self._ocdSendCommand("flash info 0")
 
                 elif selPlat["mode"] == -1:
-                    assert cOffset >= self._cfi_start_offset, f"Read address must be greater or equal than {hex(self._cfi_start_offset)}"
-
+                    self._cfi_start_offset = 0
                     self._ocdSendCommand("flash probe 0")
                     self._ocdSendCommand("flash info 0")
 
@@ -1945,7 +2191,7 @@ class MainApp(main.main):
                         NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
 
                         self._logThreadQueue.put(
-                            f'Page size: {NAND_INFO["page_size"]}')
+                            f'Page size: {NAND_INFO["page_size"] if not NAND_INFO["is_extended"] else (1024 << (NANDC._idcode & 0x3))}')
                         self._logThreadQueue.put(
                             f'Spare size: {NAND_INFO["spare_size"]}')
                         self._logThreadQueue.put(
@@ -1981,6 +2227,50 @@ class MainApp(main.main):
                     assert cOffset < (NANDC._density << 17) and eOffset < (
                         NANDC._density << 17), "Flash address is out of range"
 
+                elif selPlat["mode"] == 8:
+                    NANDC = bcm_nandregs.BCM2133NANDController(self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u16, self.cmd_write_u16, self.cmd_read_u8, self.cmd_write_u8,
+                                                               page_width=self.page_width)
+                    assert NANDC._idcode not in [
+                        0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
+
+                    MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
+                    DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
+
+                    if self.page_width == -1:
+                        if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                            NANDC._page_width = int(
+                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"])
+
+                    if self.cNandSize.Selection == 2:
+                        if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                            NANDC._page_size = int(
+                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_extended"])
+
+                    if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
+                        self._logThreadQueue.put(
+                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
+
+                    else:
+                        self._logThreadQueue.put(
+                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
+
+                    if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                        NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
+
+                        self._logThreadQueue.put(
+                            f'Page size: {NAND_INFO["page_size"] if not NAND_INFO["is_extended"] else (1024 << (NANDC._idcode & 0x3))}')
+                        self._logThreadQueue.put(
+                            f'Spare size: {NAND_INFO["spare_size"]}')
+                        self._logThreadQueue.put(
+                            f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
+                        self._logThreadQueue.put(
+                            f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
+                        self._logThreadQueue.put(
+                            f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}')
+
+                        assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
+                            "flash_size"], "Flash address is out of range"
+
                 if NANDC is None:
                     self._isInitDone = True
                     if self._isConnectRemote and self._sio:
@@ -1991,7 +2281,10 @@ class MainApp(main.main):
             self._logThreadQueue.put(
                 f"Dump flash started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
 
-            CFI_READ_BUFFER = 0x10000
+            if self._isConnectRemote and self._sio:
+                self._sio.emit("command", {"c": "isSupressed", "d": True})
+
+            CFI_READ_BUFFER = self.nor_read_size
 
             with open(name, "wb") as tempFile:
                 while cOffset < eOffset and not self._isReadCanceled:
@@ -2032,7 +2325,11 @@ class MainApp(main.main):
             self._btnMsgQueue.put(False)
             self._isRead = False
             self._isReadCanceled = False
+            if self._isConnectRemote and self._sio:
+                self._sio.emit("command", {"c": "isRead", "d": False})
             self._logSupressed = False
+            if self._isConnectRemote and self._sio:
+                self._sio.emit("command", {"c": "isSupressed", "d": False})
 
             self._doAnalytics("dump_end", addr_start=cOffset,
                               addr_end=eOffset, is_memory=False)
@@ -2057,6 +2354,9 @@ class MainApp(main.main):
             fd: wx.FileDialog
             if fd.ShowModal() != wx.ID_CANCEL:
                 self.progress.Value = 0
+                if self._isConnectRemote and self._sio:
+                    self._sio.emit("command", {"c": "progress", "d": 0})
+
                 O1N_INPUT_OFFSET = -1
 
                 if const._platforms[self.cChipset.Selection]["mode"] == 7 and "o1n_offset" not in const._platforms[self.cChipset.Selection]:
@@ -2081,6 +2381,8 @@ class MainApp(main.main):
 
     def doStop(self, event):
         self._isReadCanceled = True
+        if self._isConnectRemote and self._sio:
+            self._sio.emit("command", {"c": "doStopRead"})
         self.bStop.Enable(False)
 
     def doGo(self, event):
@@ -2120,6 +2422,10 @@ class MainApp(main.main):
                 self._loaded_dcc = None
 
             self.lCurrentDCC.SetLabel(f"DCC Loader: {self._loaded_dcc}")
+
+            path_escaped = self._loaded_dcc.replace('\\', '/')
+            self._ocdSendCommand("set _DCC_PATH {" + path_escaped + "}; " +
+                                 f"set _DCC_START_OFFSET {hex(intelhex.IntelHex(self._loaded_dcc).minaddr())}")
 
     def doScript(self, event):
         event.Skip()
@@ -2400,8 +2706,15 @@ class MainApp(main.main):
             cfg["nand_custom_cfg2"] = self.custom_cfg2
             cfg["nand_custom_cfg_common"] = self.custom_cfg_common
             cfg["nand_page_width"] = self.page_width
-            
+
             cfg["nand_init_code"] = self.nand_init_code
+
+            cfg["read_size"] = self.nor_read_size
+            cfg["max_read_pass"] = self.max_read_pass
+            cfg["max_identical"] = self.max_identical_read
+            cfg["check_identical"] = self.check_identical_reads
+            cfg["disable_platform_options"] = self.disable_platform_options
+            cfg["identical_check_mode"] = self.identical_check_mode
 
             cfg["last_updated"] = int(datetime.datetime.today().timestamp())
 
@@ -2421,9 +2734,16 @@ class MainApp(main.main):
             return
 
         t = threading.Thread(target=self.doOCDCmdExecThread, args=(temp,))
-            
+
         t.daemon = True
-        t.start()    
+        t.start()
+
+        if len(self._command_history) <= 0 or self._command_history[-1] != temp:
+            self._command_history.append(temp)
+            if len(self._command_history) > 25:
+                self._command_history.pop(0)
+
+        self._command_history_index = len(self._command_history)
 
     def doRegenUUID(self, event):
         global _PTRACKCOUNT
@@ -2443,6 +2763,42 @@ class MainApp(main.main):
     def doNANDConfigure(self, event):
         NANDControllerConfig(self).ShowModal()
 
+    def doConfigureRead(self, event):
+        TargetReadConfig(self).ShowModal()
+
+    def doProcessSpeedEntry(self, event: wx.CommandEvent):
+        self._ocdSendCommand(f"adapter speed {self.nSpeed.Value}")
+
+    def doProcessResetMode(self, event: wx.CommandEvent):
+        self._ocdSendCommand(
+            f"reset_config {const._reset_type[self.cResetMode.Selection][1]}")
+
+    def doProcessCmdArrow(self, event: wx.KeyEvent):
+        if event.KeyCode == wx.WXK_UP:
+            if self._command_history_index <= 0:
+                return
+            self._command_history_index -= 1
+
+            self.tOCDCmd.Value = self._command_history[self._command_history_index]
+
+            self.tOCDCmd.SetInsertionPointEnd()
+
+        elif event.KeyCode == wx.WXK_DOWN:
+            if self._command_history_index >= len(self._command_history):
+                return
+            self._command_history_index += 1
+
+            if self._command_history_index == len(self._command_history):
+                self.tOCDCmd.Value = ""
+
+            else:
+                self.tOCDCmd.Value = self._command_history[self._command_history_index]
+
+            self.tOCDCmd.SetInsertionPointEnd()
+
+        else:
+            event.Skip()
+
 
 def getInitCmd(self: MainApp):
     cInit = const._interfaces[self.cInterface.Selection][1].replace('(FT232R_VID)', self.tUSBID.Value.split(':')[0]).replace('(FT232R_PID)', self.tUSBID.Value.split(':')[1]).replace('(FT232R_RESTORE_SERIAL)', self.tRestoreSerial.Value).replace('(FT232H_VID)', self.tUSBID1.Value.split(':')[0]).replace('(FT232H_PID)', self.tUSBID1.Value.split(':')[1]).replace('(FT232H_CHANNEL)', str(self.cChannel.Selection)).replace('(FT232H_EDGE)', ['rising', 'falling'][self.rSamplingEdge.Selection]).replace('(FT232H_PINS)', hex(self._ft232h_pins)).replace('(FT232H_DIR)', hex(self._ft232h_dirs)).replace(
@@ -2454,7 +2810,7 @@ def getInitCmd(self: MainApp):
 
     if self.custom_reset:
         INIT_CMD = f"{cInit} telnet_port 0; gdb_port 0; tcl_port pipe; reset_config {const._reset_type[self.cResetMode.Selection][1]}; jtag_ntrst_delay {self.ntrst_reset_delay}; adapter srst delay {self.nsrst_reset_delay}; jtag_ntrst_assert_width {self.ntrst_reset_pulse}; adapter srst pulse_width {self.nsrst_reset_pulse}; "
-        
+
     else:
         INIT_CMD = f"{cInit} telnet_port 0; gdb_port 0; tcl_port pipe; reset_config {const._reset_type[self.cResetMode.Selection][1]}; "
 
@@ -2482,7 +2838,8 @@ def getInitCmd(self: MainApp):
         additinalCFG = ""
         for v in const._additional_config:
             if const._targets[t] in const._additional_config[v]:
-                additionalCFG = v
+                additionalCFG = v + "; "
+                break
 
         if const._targets[t] in const._dap_required:
             INIT_CMD += const._init_dap.replace("(IR)", str(fixedIR) if fixedIR != 0 else str(self.nIR.Value)).replace(
