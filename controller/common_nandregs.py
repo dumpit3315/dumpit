@@ -40,7 +40,7 @@ class GenericNANDController():
 
         for _ in range(4):
             self._idcode <<= 8
-            self._idcode |= self._data_read(self._nfi_data)
+            self._idcode |= (self._data_read(self._nfi_data) & 0xff)
 
         self._cmd_write(self._nfi_cle, 0xff)
 
@@ -219,7 +219,7 @@ class GenericNANDControllerGPIO():
 
         for _ in range(4):
             self._idcode <<= 8
-            self._idcode |= self._data_read(self._nfi_data)
+            self._idcode |= (self._data_read(self._nfi_data) & 0xff)
 
         self._send_cmd(0xff)
 

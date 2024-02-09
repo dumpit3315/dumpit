@@ -37,7 +37,7 @@ class BCM2133NANDController():
 
             for _ in range(4):
                 self._idcode <<= 8
-                self._idcode |= self._cmd2_read(0x2080000)
+                self._idcode |= (self._cmd2_read(0x2080000) & 0xff)
 
             self._cmd2_read(0x2080000)
 
@@ -57,7 +57,7 @@ class BCM2133NANDController():
 
             for _ in range(4):
                 self._idcode <<= 8
-                self._idcode |= self._cmd2_read(0x8000008)
+                self._idcode |= (self._cmd2_read(0x8000008) & 0xff)
 
             if self._page_width == -1:
                 self._page_width = 0
