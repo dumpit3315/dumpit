@@ -2506,7 +2506,7 @@ class MainApp(main.main):
                     self._ocdSendCommand("flash info 0")
 
                 elif selPlat["mode"] == 5:
-                    if selPlat["mode"]["reg_width"] == 0:
+                    if selPlat["reg_width"] == 0:
                         NANDC = common_nandregs.GenericNANDController(
                             self.cmd_write_u8,
                             self.cmd_read_u8,
@@ -2528,7 +2528,7 @@ class MainApp(main.main):
                             0,
                         )
 
-                    elif selPlat["mode"]["reg_width"] == 1:
+                    elif selPlat["reg_width"] == 1:
                         NANDC = common_nandregs.GenericNANDController(
                             self.cmd_write_u8,
                             self.cmd_read_u16,
@@ -2550,7 +2550,7 @@ class MainApp(main.main):
                             1,
                         )
 
-                    elif selPlat["mode"]["reg_width"] == 2:
+                    elif selPlat["reg_width"] == 2:
                         NANDC = common_nandregs.GenericNANDController(
                             self.cmd_write_u16,
                             self.cmd_read_u16,
@@ -2572,7 +2572,7 @@ class MainApp(main.main):
                             0,
                         )
 
-                    elif selPlat["mode"]["reg_width"] == 4:
+                    elif selPlat["reg_width"] == 4:
                         NANDC = common_nandregs.GenericNANDController(
                             self.cmd_write_u32,
                             self.cmd_read_u32,
@@ -2594,7 +2594,7 @@ class MainApp(main.main):
                             0,
                         )
 
-                    elif selPlat["mode"]["reg_width"] == 5:
+                    elif selPlat["reg_width"] == 5:
                         NANDC = common_nandregs.GenericNANDController(
                             self.cmd_write_u32,
                             self.cmd_read_u32,
@@ -2678,27 +2678,27 @@ class MainApp(main.main):
                         ), "Flash address is out of range"
 
                 elif selPlat["mode"] == 9:
-                    if selPlat["mode"]["reg_width"] == 1:
+                    if selPlat["reg_width"] == 1:
                         DATA_READ = self.cmd_read_u8
                         DATA_WRITE = self.cmd_write_u8
 
-                    elif selPlat["mode"]["reg_width"] == 2:
+                    elif selPlat["reg_width"] == 2:
                         DATA_READ = self.cmd_read_u16
                         DATA_WRITE = self.cmd_write_u16
 
-                    elif selPlat["mode"]["reg_width"] == 4:
+                    elif selPlat["reg_width"] == 4:
                         DATA_READ = self.cmd_read_u32
                         DATA_WRITE = self.cmd_write_u32
 
-                    if selPlat["mode"]["gpio_width"] == 1:
+                    if selPlat["gpio_width"] == 1:
                         GP_READ = self.cmd_read_u8
                         GP_WRITE = self.cmd_write_u8
 
-                    elif selPlat["mode"]["gpio_width"] == 2:
+                    elif selPlat["gpio_width"] == 2:
                         GP_READ = self.cmd_read_u16
                         GP_WRITE = self.cmd_write_u16
 
-                    elif selPlat["mode"]["gpio_width"] in [4, 5]:
+                    elif selPlat["gpio_width"] in [4, 5]:
                         GP_READ = self.cmd_read_u32
                         GP_WRITE = self.cmd_write_u32
 
@@ -2720,7 +2720,7 @@ class MainApp(main.main):
                             else self.cNandSize.Selection
                         ),
                         0,
-                        selPlat["mode"]["gpio_width"] == 5,
+                        selPlat["gpio_width"] == 5,
                     )
 
                     _msleep(const._jtag_init_delay)
