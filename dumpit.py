@@ -3387,6 +3387,9 @@ class MainApp(main.main):
         if self._isConectRemote:
             return  # No way to execute scripts in Remote
 
+        if not self._isConnect:
+            return
+
         with wx.FileDialog(
             self, "Load Script", wildcard="JIM TCL Script|*.tcl", style=wx.FD_OPEN
         ) as fd:
