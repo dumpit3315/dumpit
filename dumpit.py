@@ -3384,7 +3384,7 @@ class MainApp(main.main):
             )
 
     def doScript(self, event):
-        if self._isConectRemote:
+        if self._isConnectRemote:
             return  # No way to execute scripts in Remote
 
         if not self._isConnect:
