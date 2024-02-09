@@ -40,6 +40,7 @@ import io
 import struct
 import typing
 import getpass
+import pathlib
 
 os.environ["WXSUPPRESS_SIZER_FLAGS_CHECK"] = "1"
 _PTRACKING = queue.Queue()
@@ -975,7 +976,7 @@ class MainApp(main.main):
         self.nor_read_size = 512
         self.max_read_pass = 10
         self.max_identical_read = 3
-        self.check_identical_reads = True
+        self.check_identical_reads = False
         self.disable_platform_options = False
         self.identical_check_mode = 0
 
@@ -1327,10 +1328,11 @@ class MainApp(main.main):
                         elif p[1]["c"] == "identity":
                             self.remotePerformer = p[1]["d"]["performer"]
                             self.remoteLender = p[1]["d"]["lender"]
-                            
+
                             if self._debug_logs:
-                                print("IDENTITY CLIENT:", self.remotePerformer, self.remoteLender)
-                                
+                                print("IDENTITY CLIENT:",
+                                      self.remotePerformer, self.remoteLender)
+
                             self._sio.emit(
                                 "command",
                                 {
@@ -1413,9 +1415,9 @@ class MainApp(main.main):
                         elif p[1]["c"] == "doStopRead":
                             self._isReadCanceled = True
 
-                        elif p[1]["c"] == "identity":                            
+                        elif p[1]["c"] == "identity":
                             self.remoteAssistant = p[1]["d"]["assistant"]
-                            
+
                             if self._debug_logs:
                                 print("IDENTITY Server:", self.remoteAssistant)
 
@@ -3373,7 +3375,7 @@ class MainApp(main.main):
 
             self.lCurrentDCC.SetLabel(f"DCC Loader: {self._loaded_dcc}")
 
-            path_escaped = self._loaded_dcc.replace("\\", "/")
+            path_escaped = pathlib.Path(self._loaded_dcc).as_posix()
             self._ocdSendCommand(
                 "set _DCC_PATH {"
                 + path_escaped
@@ -3382,7 +3384,16 @@ class MainApp(main.main):
             )
 
     def doScript(self, event):
-        event.Skip()
+        if self._isConectRemote:
+            return  # No way to execute scripts in Remote
+
+        with wx.FileDialog(
+            self, "Load Script", wildcard="JIM TCL Script|*.tcl", style=wx.FD_OPEN
+        ) as fd:
+            fd: wx.FileDialog
+            if fd.ShowModal() != wx.ID_CANCEL:
+                path_escaped = pathlib.Path(fd.GetPath()).as_posix()
+                self._ocdSendCommand("script {" + path_escaped + "}")
 
     def doDisableMMU(self, event):
         if not self._isConnect and not self._isConnectRemote:
@@ -3753,7 +3764,7 @@ class MainApp(main.main):
 
     def doConfigureRead(self, event):
         TargetReadConfig(self).ShowModal()
-        
+
     def doEditMetadata(self, event):
         UserMetadataConfig(self).ShowModal()
 
@@ -3883,7 +3894,7 @@ def getInitCmd(self: MainApp):
         self._cfi_start_offset = 0
 
         if self._loaded_dcc is not None:
-            path_escaped = self._loaded_dcc.replace("\\", "/")
+            path_escaped = pathlib.Path(self._loaded_dcc).as_posix()
             INIT_CMD += (
                 "flash bank target.dcc ocl 0 0 0 0 target.cpu; set _DCC_PATH {"
                 + path_escaped

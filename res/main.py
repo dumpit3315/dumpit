@@ -246,8 +246,6 @@ class main ( wx.Frame ):
 		bSizer611111.Add( self.bHardReset, 0, wx.ALL, 5 )
 
 		self.bExecScript = wx.Button( self.dPage1, wx.ID_ANY, u"Execute Script", wx.DefaultPosition, wx.DefaultSize, 0 )
-		self.bExecScript.Enable( False )
-
 		bSizer611111.Add( self.bExecScript, 1, wx.ALL, 5 )
 
 		self.bExecLoader = wx.Button( self.dPage1, wx.ID_ANY, u"Load DCC", wx.DefaultPosition, wx.DefaultSize, 0 )

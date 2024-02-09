@@ -2879,11 +2879,11 @@
                           </object>
                         </object>
                       </object>
-                      <object class="sizeritem" expanded="false">
+                      <object class="sizeritem" expanded="true">
                         <property name="border">5</property>
                         <property name="flag">wxEXPAND|wxALIGN_CENTER_HORIZONTAL</property>
                         <property name="proportion">0</property>
-                        <object class="wxBoxSizer" expanded="false">
+                        <object class="wxBoxSizer" expanded="true">
                           <property name="minimum_size"></property>
                           <property name="name">bSizer611111</property>
                           <property name="orient">wxHORIZONTAL</property>
@@ -3219,7 +3219,7 @@
                               <property name="dock_fixed">0</property>
                               <property name="docking">Left</property>
                               <property name="drag_accept_files">0</property>
-                              <property name="enabled">0</property>
+                              <property name="enabled">1</property>
                               <property name="fg"></property>
                               <property name="floatable">1</property>
                               <property name="focus"></property>
@@ -3340,11 +3340,11 @@
                           </object>
                         </object>
                       </object>
-                      <object class="sizeritem" expanded="false">
+                      <object class="sizeritem" expanded="true">
                         <property name="border">5</property>
                         <property name="flag">wxALIGN_CENTER_HORIZONTAL|wxEXPAND</property>
                         <property name="proportion">0</property>
-                        <object class="wxBoxSizer" expanded="false">
+                        <object class="wxBoxSizer" expanded="true">
                           <property name="minimum_size"></property>
                           <property name="name">bSizer6111111</property>
                           <property name="orient">wxHORIZONTAL</property>
@@ -3576,7 +3576,7 @@
                           </object>
                         </object>
                       </object>
-                      <object class="sizeritem" expanded="false">
+                      <object class="sizeritem" expanded="true">
                         <property name="border">5</property>
                         <property name="flag">wxEXPAND</property>
                         <property name="proportion">1</property>
@@ -3713,11 +3713,11 @@
                           </object>
                         </object>
                       </object>
-                      <object class="sizeritem" expanded="false">
+                      <object class="sizeritem" expanded="true">
                         <property name="border">5</property>
                         <property name="flag">wxEXPAND</property>
                         <property name="proportion">0</property>
-                        <object class="wxBoxSizer" expanded="false">
+                        <object class="wxBoxSizer" expanded="true">
                           <property name="minimum_size"></property>
                           <property name="name">bSizer60</property>
                           <property name="orient">wxVERTICAL</property>
