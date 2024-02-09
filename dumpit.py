@@ -9,6 +9,7 @@ from res import resetDelay
 from res import nandControlConfig
 from res import nandInitScript
 from res import targetReadConfig
+from res import metadataUserEditor
 import os
 import sys
 import const
@@ -34,31 +35,36 @@ import hashlib
 from controller import qcom_nandregs
 from controller import common_nandregs
 from controller import bcm_nandregs
+import tempfile
+import io
+import struct
+import typing
+import getpass
 
 os.environ["WXSUPPRESS_SIZER_FLAGS_CHECK"] = "1"
 _PTRACKING = queue.Queue()
 _PTRACKCOUNT = {}
 
 # Unix, Windows and old Macintosh end-of-line
-newlines = [b'\n', b'\r\n', b'\r']
+newlines = [b"\n", b"\r\n", b"\r"]
 
 
-def _unbuffered(proc, stream='stdout'):
+def _unbuffered(proc, stream="stdout"):
     stream = getattr(proc, stream)
     with contextlib.closing(stream):
         while True:
             out = []
             last = stream.read(1)
             # Don't loop forever
-            if last == b'' and proc.poll() is not None:
+            if last == b"" and proc.poll() is not None:
                 break
             while last not in newlines:
                 # Don't loop forever
-                if last == b'' and proc.poll() is not None:
+                if last == b"" and proc.poll() is not None:
                     break
                 out.append(last)
                 last = stream.read(1)
-            out = b''.join(out)
+            out = b"".join(out)
             yield out
 
 
@@ -69,24 +75,28 @@ def get_arch_platform():
     """
     try:
         import platform
-        archi_bits = 64 if platform.architecture()[0] == '64bit' else 32
+
+        archi_bits = 64 if platform.architecture()[0] == "64bit" else 32
         return archi_bits
     except:
         pass
     try:
         import struct
+
         archi_bits = struct.calcsize("P") * 8
         return archi_bits
     except:
         pass
     try:
         import ctypes
+
         archi_bits = ctypes.sizeof(ctypes.c_voidp) * 8
         return archi_bits
     except:
         pass
     try:
         import sys
+
         archi_bits = 64 if sys.maxsize > 2**32 else 32
         return archi_bits
     except:
@@ -96,29 +106,46 @@ def get_arch_platform():
 
 
 def getOCDExec():
-    return os.path.join(os.path.dirname(__file__), f"ocd/{sys.platform}-{get_arch_platform()}/bin/openocd")
+    if os.path.exists(
+        os.path.join(
+            os.path.dirname(__file__),
+            f"ocd/{sys.platform}-{get_arch_platform()}/bin/openocd",
+        )
+    ):
+        return os.path.join(
+            os.path.dirname(__file__),
+            f"ocd/{sys.platform}-{get_arch_platform()}/bin/openocd",
+        )
+
+    return os.path.join(f"ocd/{sys.platform}-{get_arch_platform()}/bin/openocd")
 
 
 def _msleep(dur: int):
     s = time.perf_counter_ns()
-    while time.perf_counter_ns() < (s+(dur*1000)):
+    while time.perf_counter_ns() < (s + (dur * 1000)):
         pass
 
 
 def doTrackThread(user_id, action, openocd_version, config, **kwargs):
     try:
-        res = requests.post("https://dumpit.ucomsite.my.id/analytics/track", json={
-            "user_id": user_id,
-            "action": action,
-            "dumpit_version": const.DUMPIT_VERSION,
-            "python_version": sys.version,
-            "openocd_version": openocd_version,
-            "os": f"{platform.system()} {platform.version()}",
-            "config": config,
-            **kwargs
-        }, timeout=5)
+        res = requests.post(
+            "https://dumpit.ucomsite.my.id/analytics/track",
+            json={
+                "user_id": user_id,
+                "action": action,
+                "dumpit_version": const.DUMPIT_VERSION,
+                "python_version": sys.version,
+                "openocd_version": openocd_version,
+                "os": f"{platform.system()} {platform.version()}",
+                "config": config,
+                **kwargs,
+            },
+            timeout=5,
+        )
 
-        assert res.status_code >= 200 and res.status_code <= 299, f"{res.status_code} {res.reason}"
+        assert (
+            res.status_code >= 200 and res.status_code <= 299
+        ), f"{res.status_code} {res.reason}"
         _PTRACKING.put(action)
 
     except Exception:
@@ -127,7 +154,7 @@ def doTrackThread(user_id, action, openocd_version, config, **kwargs):
             traceback.print_exc()
 
 
-'''
+"""
 class ForwardApp(forwardDialog.forwardDialog):
     def __init__(self, parent, token):
         super().__init__(parent)
@@ -248,7 +275,7 @@ class ForwardApp(forwardDialog.forwardDialog):
     def doStop(self, event):
         self._ws_parent._sio.call("bye", "", timeout=30)
         self._ws_parent._sio.disconnect()
-'''
+"""
 
 
 class ForwardApp(forwardDialog.forwardDialog):
@@ -348,7 +375,8 @@ class FT232HConfig(ft232h_pinconfig.FT232H_Pin_Config):
         self.c_Board.Selection = 0
 
         self.board.Bitmap = wx.Bitmap(
-            const._ft232h_boards[self.c_Board.Selection][1], wx.BITMAP_TYPE_ANY)
+            const._ft232h_boards[self.c_Board.Selection][1], wx.BITMAP_TYPE_ANY
+        )
         self.isFlip = const._ft232h_boards[self.c_Board.Selection][2]
 
         self.Layout()
@@ -364,7 +392,8 @@ class FT232HConfig(ft232h_pinconfig.FT232H_Pin_Config):
                     continue
                 getattr(self, f"cfg_p2{i}").Clear()
                 getattr(self, f"cfg_p2{i}").Append(
-                    [u"TDI", u"TDO", u"TCK", u"TMS", u"TRST", u"SRST", u"High", u"Low"])
+                    ["TDI", "TDO", "TCK", "TMS", "TRST", "SRST", "High", "Low"]
+                )
                 getattr(self, f"cfg_p2{i}").Selection = 0
                 getattr(self, f"cfg_p2{i}").Enable(True)
 
@@ -372,7 +401,8 @@ class FT232HConfig(ft232h_pinconfig.FT232H_Pin_Config):
                 self.pins_layout.append(getattr(self, f"cfg_p1{i}"))
                 getattr(self, f"cfg_p1{i}").Clear()
                 getattr(self, f"cfg_p1{i}").Append(
-                    [u"TDI", u"TDO", u"TCK", u"TMS", u"TRST", u"SRST", u"High", u"Low"])
+                    ["TDI", "TDO", "TCK", "TMS", "TRST", "SRST", "High", "Low"]
+                )
                 getattr(self, f"cfg_p1{i}").Selection = 0
                 getattr(self, f"cfg_p1{i}").Enable(True)
 
@@ -388,7 +418,8 @@ class FT232HConfig(ft232h_pinconfig.FT232H_Pin_Config):
                     continue
                 getattr(self, f"cfg_p1{i}").Clear()
                 getattr(self, f"cfg_p1{i}").Append(
-                    [u"TDI", u"TDO", u"TCK", u"TMS", u"TRST", u"SRST", u"High", u"Low"])
+                    ["TDI", "TDO", "TCK", "TMS", "TRST", "SRST", "High", "Low"]
+                )
                 getattr(self, f"cfg_p1{i}").Selection = 0
                 getattr(self, f"cfg_p1{i}").Enable(True)
 
@@ -396,7 +427,8 @@ class FT232HConfig(ft232h_pinconfig.FT232H_Pin_Config):
                 self.pins_layout.append(getattr(self, f"cfg_p2{i}"))
                 getattr(self, f"cfg_p2{i}").Clear()
                 getattr(self, f"cfg_p2{i}").Append(
-                    [u"TDI", u"TDO", u"TCK", u"TMS", u"TRST", u"SRST", u"High", u"Low"])
+                    ["TDI", "TDO", "TCK", "TMS", "TRST", "SRST", "High", "Low"]
+                )
                 getattr(self, f"cfg_p2{i}").Selection = 0
                 getattr(self, f"cfg_p2{i}").Enable(True)
 
@@ -430,7 +462,8 @@ class FT232HConfig(ft232h_pinconfig.FT232H_Pin_Config):
 
     def doChangeBoard(self, event):
         self.board.Bitmap = wx.Bitmap(
-            const._ft232h_boards[self.c_Board.Selection][1], wx.BITMAP_TYPE_ANY)
+            const._ft232h_boards[self.c_Board.Selection][1], wx.BITMAP_TYPE_ANY
+        )
         self.isFlip = const._ft232h_boards[self.c_Board.Selection][2]
 
         self.Layout()
@@ -476,11 +509,18 @@ class FT232HConfig(ft232h_pinconfig.FT232H_Pin_Config):
                         return
                     hasSRST = True
 
-        if not hasTDI or not hasTDO or not hasTCK or not hasTMS or not hasTRST or not hasSRST:
+        if (
+            not hasTDI
+            or not hasTDO
+            or not hasTCK
+            or not hasTMS
+            or not hasTRST
+            or not hasSRST
+        ):
             return
 
-        self.base_parent._ft232h_pins = 0xffff
-        self.base_parent._ft232h_dirs = 0xffff
+        self.base_parent._ft232h_pins = 0xFFFF
+        self.base_parent._ft232h_dirs = 0xFFFF
 
         for e, p in enumerate(self.pins_layout):
             if e != 7:
@@ -552,7 +592,8 @@ class FT232RConfig(ft232r_pinconfig.FT232R_Pin_Config):
         self.c_Board.Selection = 0
 
         self.board.Bitmap = wx.Bitmap(
-            const._ft232r_boards[self.c_Board.Selection][1], wx.BITMAP_TYPE_ANY)
+            const._ft232r_boards[self.c_Board.Selection][1], wx.BITMAP_TYPE_ANY
+        )
         self.Layout()
 
         self.cfg_tdi.Selection = self.base_parent._ft232r_tdi
@@ -562,12 +603,19 @@ class FT232RConfig(ft232r_pinconfig.FT232R_Pin_Config):
         self.cfg_trst.Selection = self.base_parent._ft232r_trst
         self.cfg_srst.Selection = self.base_parent._ft232r_srst
 
-        self.pin_layout = [self.cfg_tdi, self.cfg_tdo,
-                           self.cfg_tck, self.cfg_tms, self.cfg_trst, self.cfg_srst]
+        self.pin_layout = [
+            self.cfg_tdi,
+            self.cfg_tdo,
+            self.cfg_tck,
+            self.cfg_tms,
+            self.cfg_trst,
+            self.cfg_srst,
+        ]
 
     def doChangeBoard(self, event):
         self.board.Bitmap = wx.Bitmap(
-            const._ft232r_boards[self.c_Board.Selection][1], wx.BITMAP_TYPE_ANY)
+            const._ft232r_boards[self.c_Board.Selection][1], wx.BITMAP_TYPE_ANY
+        )
         self.Layout()
 
     def doApply(self, events):
@@ -610,11 +658,13 @@ class ResetConfig(resetDelay.ResetDelayConfig):
         self.base_parent.custom_reset = self.cUseCustom.Value
         if not self.cUseCustom.Value:
             self.base_parent._ocdSendCommand(
-                f"jtag_ntrst_delay 0; adapter srst delay 0; jtag_ntrst_assert_width 0; adapter srst pulse_width 0")
+                f"jtag_ntrst_delay 0; adapter srst delay 0; jtag_ntrst_assert_width 0; adapter srst pulse_width 0"
+            )
 
         else:
             self.base_parent._ocdSendCommand(
-                f"jtag_ntrst_delay {self.base_parent.ntrst_reset_delay}; adapter srst delay {self.base_parent.nsrst_reset_delay}; jtag_ntrst_assert_width {self.base_parent.ntrst_reset_pulse}; adapter srst pulse_width {self.base_parent.nsrst_reset_pulse}")
+                f"jtag_ntrst_delay {self.base_parent.ntrst_reset_delay}; adapter srst delay {self.base_parent.nsrst_reset_delay}; jtag_ntrst_assert_width {self.base_parent.ntrst_reset_pulse}; adapter srst pulse_width {self.base_parent.nsrst_reset_pulse}"
+            )
         self.EndModal(0)
 
     def bDoCancel(self, event):
@@ -709,6 +759,34 @@ class TargetReadConfig(targetReadConfig.TargetReadConfig):
         self.EndModal(0)
 
 
+class UserMetadataConfig(metadataUserEditor.MetadataEditor):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.base_parent: MainApp = parent
+
+        self.tDeviceName.Value = self.base_parent.metadata["device_name"]
+        self.tManufacturer.Value = self.base_parent.metadata["device_manufacturer"]
+        self.tPerformer.Value = self.base_parent.metadata["performer"]
+        self.tDeviceVersion.Value = self.base_parent.metadata["device_version"]
+        self.tLender.Value = self.base_parent.metadata["lender"]
+
+        self.cDisableMetadata.Value = self.base_parent.metadata["ignore_metadata"]
+
+    def doApply(self, event):
+        self.base_parent.metadata["device_name"] = self.tDeviceName.Value
+        self.base_parent.metadata["device_manufacturer"] = self.tManufacturer.Value
+        self.base_parent.metadata["performer"] = self.tPerformer.Value
+        self.base_parent.metadata["device_version"] = self.tDeviceVersion.Value
+        self.base_parent.metadata["lender"] = self.tLender.Value
+
+        self.base_parent.metadata["ignore_metadata"] = self.cDisableMetadata.Value
+
+        self.EndModal(0)
+
+    def doCancel(self, event):
+        self.EndModal(0)
+
+
 class InitCodeEditor(nandInitScript.NANDCodeEdit):
     def __init__(self, parent):
         super().__init__(parent)
@@ -758,7 +836,7 @@ class MainApp(main.main):
 
         self.cResetMode.Selection = 3
 
-        '''
+        """
         self._resetDelays = []
 
         for e in const._reset_delays:
@@ -773,7 +851,7 @@ class MainApp(main.main):
                 f"{rt}ms TRST / {rs}ms SRST / {sr}ms RST delay / {rt_a}ms TRST assert / {rs_a}ms SRST assert")
 
         self.cResetDelay.Selection = 0
-        '''
+        """
 
         for p in const._platforms:
             self.cChipset.Append(p["name"])
@@ -781,17 +859,24 @@ class MainApp(main.main):
         self.cChipset.Selection = 0
         self.progress.Value = 0
 
-        self._ocd_version = subprocess.check_output([getOCDExec(
-        ), "--version"], encoding="utf-8", stderr=subprocess.STDOUT).splitlines()[0].rstrip()
+        self._ocd_version = (
+            subprocess.check_output(
+                [getOCDExec(), "--version"], encoding="utf-8", stderr=subprocess.STDOUT
+            )
+            .splitlines()[0]
+            .rstrip()
+        )
 
-        self.status.Value += f"Dumpit v{const.DUMPIT_VERSION}\nOpenOCD: {self._ocd_version}"
+        self.status.Value += (
+            f"Dumpit v{const.DUMPIT_VERSION}\nOpenOCD: {self._ocd_version}"
+        )
 
         for name, parm in const._ft232h_adapters:
             self.cFTAdapter.Append(name)
 
         self.cFTAdapter.Selection = 0
 
-        ''' Start dumpit stuff '''
+        """ Start dumpit stuff """
         self._isConnect = False
         self._isConnectRemote = False
         self._isForward = False
@@ -836,9 +921,10 @@ class MainApp(main.main):
         self._ft232h_trst = const._ft232h_default_jtag_trst
         self._ft232h_srst = const._ft232h_default_jtag_srst
 
-        self._ft232h_pins = 0xffff & ~(
-            1 << self._ft232h_tdi | 1 << self._ft232h_tdo | 1 << self._ft232h_tck)
-        self._ft232h_dirs = 0xffff & ~(1 << self._ft232h_tdo)
+        self._ft232h_pins = 0xFFFF & ~(
+            1 << self._ft232h_tdi | 1 << self._ft232h_tdo | 1 << self._ft232h_tck
+        )
+        self._ft232h_dirs = 0xFFFF & ~(1 << self._ft232h_tdo)
 
         self._ft232r_tdi = const._ft232r_bit_rx
         self._ft232r_tdo = const._ft232r_bit_rts
@@ -896,12 +982,31 @@ class MainApp(main.main):
         self._command_history = []
         self._command_history_index = 0
 
-        self._nand_idcodes = json.load(
-            open(os.path.join(os.path.dirname(__file__), "nand_ids.json"), "r"))
+        self.idcode = 0
+        self.metadata = {
+            "ignore_metadata": False,
+            "device_name": "unknown",
+            "device_manufacturer": "unknown",
+            "performer": getpass.getuser(),
+            "device_version": "unknown",
+            "lender": "",
+        }
 
-        if os.path.exists(os.path.join(os.path.dirname(__file__), "dumpit_config.json")):
+        self.remotePerformer = ""
+        self.remoteAssistant = ""
+        self.remoteLender = ""
+
+        self._nand_idcodes = json.load(
+            open(os.path.join(os.path.dirname(__file__), "nand_ids.json"), "r")
+        )
+
+        if os.path.exists(
+            os.path.join(os.path.dirname(__file__), "dumpit_config.json")
+        ):
             cfg = json.load(
-                open(os.path.join(os.path.dirname(__file__), "dumpit_config.json"), "r"))
+                open(os.path.join(os.path.dirname(
+                    __file__), "dumpit_config.json"), "r")
+            )
             if "interface" in cfg:
                 self.cInterface.Selection = cfg["interface"]
             if "speed" in cfg:
@@ -982,9 +1087,20 @@ class MainApp(main.main):
                 self._ft232h_srst = cfg["ft232h_srst"]
 
             if "ft232h_pins" in cfg:
-                self._ft232h_pins = (cfg["ft232h_pins"] & ~(1 << self._ft232h_tdi | 1 << self._ft232h_tdo | 1 <<
-                                                            self._ft232h_tck)) | 1 << self._ft232h_tms | 1 << self._ft232h_trst | 1 << self._ft232h_srst
-                self._ft232h_dirs = 0xffff & ~(1 << self._ft232h_tdo)
+                self._ft232h_pins = (
+                    (
+                        cfg["ft232h_pins"]
+                        & ~(
+                            1 << self._ft232h_tdi
+                            | 1 << self._ft232h_tdo
+                            | 1 << self._ft232h_tck
+                        )
+                    )
+                    | 1 << self._ft232h_tms
+                    | 1 << self._ft232h_trst
+                    | 1 << self._ft232h_srst
+                )
+                self._ft232h_dirs = 0xFFFF & ~(1 << self._ft232h_tdo)
 
             if "gpio_chip" in cfg:
                 self.nGPIODChip.Value = cfg["gpio_chip"]
@@ -1046,6 +1162,9 @@ class MainApp(main.main):
             if "identical_check_mode" in cfg:
                 self.identical_check_mode = cfg["identical_check_mode"]
 
+            if "metadata" in cfg:
+                self.metadata = cfg["metadata"]
+
         if not self.tUserID.Value:
             self.tUserID.Value = str(uuid.uuid4())
 
@@ -1094,7 +1213,8 @@ class MainApp(main.main):
             cfg["ft232h_usb_id"] = self.tUSBID1.Value
             cfg["ft232h_channel"] = self.cChannel.Selection
             cfg["ft232h_sampling_edge"] = self.rSamplingEdge.GetString(
-                self.rSamplingEdge.Selection)
+                self.rSamplingEdge.Selection
+            )
             cfg["ft232h_tdi"] = self._ft232h_tdi
             cfg["ft232h_tdo"] = self._ft232h_tdo
             cfg["ft232h_tck"] = self._ft232h_tck
@@ -1136,8 +1256,11 @@ class MainApp(main.main):
 
             cfg["dcc_used"] = self._loaded_dcc is not None
 
-            pAnalyticsThread = threading.Thread(target=doTrackThread, args=(
-                self.tUserID.Value, action, self._ocd_version, cfg), kwargs=kwargs)
+            pAnalyticsThread = threading.Thread(
+                target=doTrackThread,
+                args=(self.tUserID.Value, action, self._ocd_version, cfg),
+                kwargs=kwargs,
+            )
             pAnalyticsThread.daemon = True
 
             pAnalyticsThread.start()
@@ -1151,7 +1274,8 @@ class MainApp(main.main):
                         log_randid = random.randbytes(16).hex()
                         self._logPushBuff.append((l, log_randid))
                         self._logPushDelay.put(
-                            {"data": l.decode("utf-8"), "id": log_randid})
+                            {"data": l.decode("utf-8"), "id": log_randid}
+                        )
 
             except Exception:
                 pass
@@ -1200,7 +1324,27 @@ class MainApp(main.main):
                             self.cChipset.Selection = p[1]["d"]["chipset"]
                             self.cTarget.Selection = p[1]["d"]["target"]
 
-                    elif p[0] == "log" and (not self._logSupressed or p[1].startswith(b"Error:")):
+                        elif p[1]["c"] == "identity":
+                            self.remotePerformer = p[1]["d"]["performer"]
+                            self.remoteLender = p[1]["d"]["lender"]
+                            
+                            if self._debug_logs:
+                                print("IDENTITY CLIENT:", self.remotePerformer, self.remoteLender)
+                                
+                            self._sio.emit(
+                                "command",
+                                {
+                                    "c": "identity",
+                                    "d": {"assistant": self.remoteAssistant},
+                                },
+                            )
+
+                        elif p[1]["c"] == "idcode":
+                            self.idcode = p[1]["d"]
+
+                    elif p[0] == "log" and (
+                        not self._logSupressed or p[1].startswith(b"Error:")
+                    ):
                         self._logThreadQueue.put(p[1])
 
                     elif p[0] == "bye":
@@ -1215,7 +1359,8 @@ class MainApp(main.main):
 
                     elif p[0] == "protocol" and p[1] == "dumpit":
                         res = self._sio.call(
-                            "forward_reconnect", self._reconnect_token, timeout=5)
+                            "forward_reconnect", self._reconnect_token, timeout=5
+                        )
 
                         if not res["error"]:
                             self._reconnect_token = res["reconnect_token"]
@@ -1268,6 +1413,12 @@ class MainApp(main.main):
                         elif p[1]["c"] == "doStopRead":
                             self._isReadCanceled = True
 
+                        elif p[1]["c"] == "identity":                            
+                            self.remoteAssistant = p[1]["d"]["assistant"]
+                            
+                            if self._debug_logs:
+                                print("IDENTITY Server:", self.remoteAssistant)
+
                     elif p[0] == "bye":
                         # print("bye event")
                         self._sio.disconnect()
@@ -1280,7 +1431,8 @@ class MainApp(main.main):
 
                     elif p[0] == "protocol" and p[1] == "dumpit":
                         res = self._sio.call(
-                            "forward_reconnect", self._reconnect_token, timeout=5)
+                            "forward_reconnect", self._reconnect_token, timeout=5
+                        )
 
                         if not res["error"]:
                             self._reconnect_token = res["reconnect_token"]
@@ -1288,7 +1440,9 @@ class MainApp(main.main):
                             for l, id in self._logPushBuff:
                                 time.sleep(0.1)
                                 self._sio.emit(
-                                    "log_req", {"data": l.decode("utf-8"), "id": id})
+                                    "log_req", {"data": l.decode(
+                                        "utf-8"), "id": id}
+                                )
 
                         else:
                             self._sio.disconnect()
@@ -1355,10 +1509,13 @@ class MainApp(main.main):
             try:
                 p = self._progMsgQueue.get_nowait()
                 self.progress.Value = min(
-                    self.progress.Range, int(p * self.progress.Range))
+                    self.progress.Range, int(p * self.progress.Range)
+                )
                 if self._isConnectRemote and self._sio:
                     self._sio.emit(
-                        "command", {"c": "progress", "d": int(p * self.progress.Range)})
+                        "command", {"c": "progress", "d": int(
+                            p * self.progress.Range)}
+                    )
 
             except queue.Empty:
                 pass
@@ -1379,7 +1536,12 @@ class MainApp(main.main):
             except queue.Empty:
                 pass
 
-        if self._isForward and self._ocd and self._isConnect and self._ocd.poll() is not None:
+        if (
+            self._isForward
+            and self._ocd
+            and self._isConnect
+            and self._ocd.poll() is not None
+        ):
             try:
                 self._sio.call("bye", "", timeout=30)
             except Exception:
@@ -1388,7 +1550,12 @@ class MainApp(main.main):
             self._isConnect = False
             self._isForward = False
 
-        if self._ocd and self._isConnect and self._ocd.poll() is not None and not self._isForward:
+        if (
+            self._ocd
+            and self._isConnect
+            and self._ocd.poll() is not None
+            and not self._isForward
+        ):
             self._isConnect = False
             self.bConnect.Label = "Connect"
             self.bConnectRemote.Enable(True)
@@ -1402,7 +1569,12 @@ class MainApp(main.main):
             self.bForwardRemote.Enable(True)
             self._doAnalytics("disconnect", reason=2)
 
-            if self._isForward and self._ocd and self._isConnect and self._ocd.poll() is None:
+            if (
+                self._isForward
+                and self._ocd
+                and self._isConnect
+                and self._ocd.poll() is None
+            ):
                 self._ocd.terminate()
                 self._isConnect = False
                 self._isForward = False
@@ -1511,8 +1683,13 @@ class MainApp(main.main):
             self._isForward = False
 
             self.status.Value = f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n'
-            self._ocd = subprocess.Popen([getOCDExec(
-            ), "-c", INIT_CMD], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=os.path.dirname(__file__))
+            self._ocd = subprocess.Popen(
+                [getOCDExec(), "-c", INIT_CMD],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=os.path.dirname(__file__),
+            )
 
             self._ocdSendCommand("")
 
@@ -1531,7 +1708,8 @@ class MainApp(main.main):
             self.bConnectRemote.Enable(False)
             self.bForwardRemote.Enable(False)
 
-            self._doAnalytics("idcode", idcode=self.cmd_get_idcode())
+            self.idcode = self.cmd_get_idcode()
+            self._doAnalytics("idcode", idcode=self.idcode)
 
     def doReconnectRemote(self, event):
         if not self._isConnectRemote:
@@ -1543,11 +1721,20 @@ class MainApp(main.main):
             time.sleep(2)
 
             self._sio = socketio.SimpleClient(
-                handle_sigint=False, reconnection_delay=0.5, reconnection_delay_max=0.5)
+                handle_sigint=False, reconnection_delay=0.5, reconnection_delay_max=0.5
+            )
             gc.collect()
 
-            self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith(
-                "::1") or self.bTargetRemote.Value.startswith("[::1]") else f"https://{self.bTargetRemote.Value}/", transports=["websocket"], socketio_path="dumpit_remote")
+            self._sio.connect(
+                f"http://{self.bTargetRemote.Value}/"
+                if self.bTargetRemote.Value.startswith("localhost")
+                or self.bTargetRemote.Value.startswith("127.0.0.1")
+                or self.bTargetRemote.Value.startswith("::1")
+                or self.bTargetRemote.Value.startswith("[::1]")
+                else f"https://{self.bTargetRemote.Value}/",
+                transports=["websocket"],
+                socketio_path="dumpit_remote",
+            )
 
             while True:
                 p = self._sio.receive(5)
@@ -1599,13 +1786,22 @@ class MainApp(main.main):
             self._isInitDone = False
 
             self._sio = socketio.SimpleClient(
-                handle_sigint=False, reconnection_delay=0.5, reconnection_delay_max=0.5)
+                handle_sigint=False, reconnection_delay=0.5, reconnection_delay_max=0.5
+            )
             gc.collect()
 
             self._doAnalytics("connect", type=2)
 
-            self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith(
-                "::1") or self.bTargetRemote.Value.startswith("[::1]") else f"https://{self.bTargetRemote.Value}/", transports=["websocket"], socketio_path="dumpit_remote")
+            self._sio.connect(
+                f"http://{self.bTargetRemote.Value}/"
+                if self.bTargetRemote.Value.startswith("localhost")
+                or self.bTargetRemote.Value.startswith("127.0.0.1")
+                or self.bTargetRemote.Value.startswith("::1")
+                or self.bTargetRemote.Value.startswith("[::1]")
+                else f"https://{self.bTargetRemote.Value}/",
+                transports=["websocket"],
+                socketio_path="dumpit_remote",
+            )
 
             while True:
                 p = self._sio.receive(5)
@@ -1629,6 +1825,10 @@ class MainApp(main.main):
                 raise Exception(res["error"])
 
             self._reconnect_token = res["reconnect_token"]
+
+            self.remotePerformer = ""
+            self.remoteLender = ""
+            self.remoteAssistant = self.metadata["performer"]
 
             # self.bReconnectRemote.Show()
             # self.bForwardRemote.Hide()
@@ -1687,11 +1887,20 @@ class MainApp(main.main):
             self._isInitDone = False
 
             self._sio = socketio.SimpleClient(
-                handle_sigint=False, reconnection_delay=0.5, reconnection_delay_max=0.5)
+                handle_sigint=False, reconnection_delay=0.5, reconnection_delay_max=0.5
+            )
             gc.collect()
 
-            self._sio.connect(f"http://{self.bTargetRemote.Value}/" if self.bTargetRemote.Value.startswith("localhost") or self.bTargetRemote.Value.startswith("127.0.0.1") or self.bTargetRemote.Value.startswith(
-                "::1") or self.bTargetRemote.Value.startswith("[::1]") else f"https://{self.bTargetRemote.Value}/", transports=["websocket"], socketio_path="dumpit_remote")
+            self._sio.connect(
+                f"http://{self.bTargetRemote.Value}/"
+                if self.bTargetRemote.Value.startswith("localhost")
+                or self.bTargetRemote.Value.startswith("127.0.0.1")
+                or self.bTargetRemote.Value.startswith("::1")
+                or self.bTargetRemote.Value.startswith("[::1]")
+                else f"https://{self.bTargetRemote.Value}/",
+                transports=["websocket"],
+                socketio_path="dumpit_remote",
+            )
 
             while True:
                 p = self._sio.receive(5)
@@ -1725,23 +1934,65 @@ class MainApp(main.main):
 
                 self.log_time = time.perf_counter() + 0.1
 
-                self.status.Value = f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n'
+                self.remotePerformer = self.metadata["performer"]
+                self.remoteLender = self.metadata["lender"]
+                self.remoteAssistant = ""
+
+                self._sio.emit(
+                    "command",
+                    {
+                        "c": "identity",
+                        "d": {
+                            "performer": self.remotePerformer,
+                            "lender": self.remoteLender,
+                        },
+                    },
+                )
+
+                self.status.Value = (
+                    f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n'
+                )
 
                 log_randid = random.randbytes(16).hex()
                 self._logPushBuff.append(
-                    (f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n'.encode("utf-8"), log_randid))
+                    (
+                        f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n'.encode(
+                            "utf-8"
+                        ),
+                        log_randid,
+                    )
+                )
 
                 time.sleep(0.1)
                 self._sio.emit(
-                    "log_req", {"data": f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n', "id": log_randid})
+                    "log_req",
+                    {
+                        "data": f'Command-line arguments: openocd -c "{INIT_CMD}"\n\n',
+                        "id": log_randid,
+                    },
+                )
 
-                self._ocd = subprocess.Popen([getOCDExec(
-                ), "-c", INIT_CMD], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=os.path.dirname(__file__))
+                self._ocd = subprocess.Popen(
+                    [getOCDExec(), "-c", INIT_CMD],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    cwd=os.path.dirname(__file__),
+                )
 
                 self._ocdSendCommand("")
 
-                self._sio.emit("command", {"c": "configure", "d": {
-                               "cfi_base_offset": self._cfi_start_offset, "chipset": self.cChipset.Selection, "target": self.cTarget.Selection}})
+                self._sio.emit(
+                    "command",
+                    {
+                        "c": "configure",
+                        "d": {
+                            "cfi_base_offset": self._cfi_start_offset,
+                            "chipset": self.cChipset.Selection,
+                            "target": self.cTarget.Selection,
+                        },
+                    },
+                )
 
                 self._logThreadQueue = queue.Queue()
                 self._sioMsgQueue = queue.Queue()
@@ -1775,7 +2026,10 @@ class MainApp(main.main):
                 self.bConnectRemote.Enable(False)
                 self.bForwardRemote.Enable(False)
 
-                self._doAnalytics("idcode", idcode=self.cmd_get_idcode())
+                self.idcode = self.cmd_get_idcode()
+                self._sio.emit("command", {"c": "idcode", "d": self.idcode})
+
+                self._doAnalytics("idcode", idcode=self.idcode)
 
         except Exception as e:
             if self._sio and self._sio.connected:
@@ -1792,7 +2046,8 @@ class MainApp(main.main):
 
     def doHexCheck(self, event: wx.CommandEvent):
         event.EventObject.ChangeValue(
-            re.sub("([^0-9a-fA-F]+)", "", event.EventObject.GetValue()))
+            re.sub("([^0-9a-fA-F]+)", "", event.EventObject.GetValue())
+        )
 
     def cmd_get_idcode(self):
         if not self._isConnect and not self._isConnectRemote:
@@ -1812,11 +2067,14 @@ class MainApp(main.main):
         c = self._ocdSendCommand(f"read_memory {hex(offset)} 8 {size}")
 
         if c.startswith("0x"):
-            return int(c, 16) if size <= 1 else bytes([int(x, 16) for x in c.split(" ")])
+            return (
+                int(c, 16) if size <= 1 else bytes(
+                    [int(x, 16) for x in c.split(" ")])
+            )
 
         else:
             self._logThreadQueue.put(f"Invalid hex data: {c}")
-            return 0xff if size <= 1 else b"\xff" * size
+            return 0xFF if size <= 1 else b"\xff" * size
 
     def cmd_read_u16(self, offset: int, size: int = 1):
         if not self._isConnect and not self._isConnectRemote:
@@ -1831,7 +2089,7 @@ class MainApp(main.main):
 
         else:
             self._logThreadQueue.put(f"Invalid hex data: {c}")
-            return 0xffff if size <= 1 else b"\xff\xff" * size
+            return 0xFFFF if size <= 1 else b"\xff\xff" * size
 
     def cmd_read_u32(self, offset: int, size: int = 1):
         if not self._isConnect and not self._isConnectRemote:
@@ -1846,7 +2104,7 @@ class MainApp(main.main):
 
         else:
             self._logThreadQueue.put(f"Invalid hex data: {c}")
-            return 0xffffffff if size <= 1 else b"\xff\xff\xff\xff" * size
+            return 0xFFFFFFFF if size <= 1 else b"\xff\xff\xff\xff" * size
 
     def cmd_read_flash(self, offset: int, size: int = 1):
         if not self._isConnect and not self._isConnectRemote:
@@ -1869,7 +2127,10 @@ class MainApp(main.main):
             return 0
 
         try:
-            return int(self._ocdSendCommand(f"arm mrc 15 {op_1} {cr_n} {cr_m} {op_2}"), 16)
+            return int(
+                self._ocdSendCommand(
+                    f"arm mrc 15 {op_1} {cr_n} {cr_m} {op_2}"), 16
+            )
 
         except Exception:
             return 0
@@ -1878,7 +2139,8 @@ class MainApp(main.main):
         if not self._isConnect and not self._isConnectRemote:
             return 0
         self._ocdSendCommand(
-            f"arm mcr 15 {hex(op_1)} {hex(cr_n)} {hex(cr_m)} {hex(op_2)} {hex(value)}")
+            f"arm mcr 15 {hex(op_1)} {hex(cr_n)} {hex(cr_m)} {hex(op_2)} {hex(value)}"
+        )
 
     def cmd_write_u8(self, offset: int, value: int):
         if not self._isConnect and not self._isConnectRemote:
@@ -1909,14 +2171,16 @@ class MainApp(main.main):
         if self._isConnectRemote and self._sio:
             self._sio.emit("command", {"c": "isRead", "d": True})
 
-        self._doAnalytics("dump_start", addr_start=cOffset,
-                          addr_end=eOffset, is_memory=True)
+        self._doAnalytics(
+            "dump_start", addr_start=cOffset, addr_end=eOffset, is_memory=True
+        )
 
         self._ocdSendCommand("halt")
 
         self._logSupressed = True
         self._logThreadQueue.put(
-            f"Dump memory started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
+            f"Dump memory started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}"
+        )
 
         if self._isConnectRemote and self._sio:
             self._sio.emit("command", {"c": "isSupressed", "d": True})
@@ -1926,14 +2190,18 @@ class MainApp(main.main):
         try:
             with open(name, "wb") as tempFile:
                 while cOffset < eOffset and not self._isReadCanceled:
-                    tempFile.write(self.cmd_read_u8(
-                        cOffset, min(CFI_READ_BUFFER, eOffset - cOffset)))
+                    tempFile.write(
+                        self.cmd_read_u8(
+                            cOffset, min(CFI_READ_BUFFER, eOffset - cOffset)
+                        )
+                    )
                     cOffset += min(CFI_READ_BUFFER, eOffset - cOffset)
 
-                    self._progMsgQueue.put(cOffset/eOffset)
+                    self._progMsgQueue.put(cOffset / eOffset)
 
             self._logThreadQueue.put(
-                f"Dump memory finished {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
+                f"Dump memory finished {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
 
         except Exception as e:
             traceback.print_exc()
@@ -1952,8 +2220,9 @@ class MainApp(main.main):
             if self._isConnectRemote and self._sio:
                 self._sio.emit("command", {"c": "isSupressed", "d": False})
 
-            self._doAnalytics("dump_end", addr_start=cOffset,
-                              addr_end=eOffset, is_memory=True)
+            self._doAnalytics(
+                "dump_end", addr_start=cOffset, addr_end=eOffset, is_memory=True
+            )
 
     def doReadMemory(self, event):
         if (not self._isConnect and not self._isConnectRemote) or self._isRead:
@@ -1963,9 +2232,16 @@ class MainApp(main.main):
         eOffset = int(self.tEnd.Value, 16)
 
         if cOffset >= eOffset:
-            return wx.MessageBox(f"start offset must be less than end offset", "Dumpit", wx.OK | wx.CENTER | wx.ICON_ERROR, self)
+            return wx.MessageBox(
+                f"start offset must be less than end offset",
+                "Dumpit",
+                wx.OK | wx.CENTER | wx.ICON_ERROR,
+                self,
+            )
 
-        with wx.FileDialog(self, "Dump memory", wildcard="Binary file|*.bin", style=wx.FD_SAVE) as fd:
+        with wx.FileDialog(
+            self, "Dump memory", wildcard="Binary file|*.bin", style=wx.FD_SAVE
+        ) as fd:
             fd: wx.FileDialog
             if fd.ShowModal() != wx.ID_CANCEL:
                 self.progress.Value = 0
@@ -1973,7 +2249,9 @@ class MainApp(main.main):
                     self._sio.emit("command", {"c": "progress", "d": 0})
 
                 self._dumpThread = threading.Thread(
-                    target=self.doReadMemoryThread, args=(fd.GetPath(), cOffset, eOffset))
+                    target=self.doReadMemoryThread,
+                    args=(fd.GetPath(), cOffset, eOffset),
+                )
                 self._dumpThread.daemon = True
 
                 self._dumpThread.start()
@@ -1991,8 +2269,9 @@ class MainApp(main.main):
         NANDC = None
 
         self._btnMsgQueue.put(True)
-        self._doAnalytics("dump_start", addr_start=cOffset,
-                          addr_end=eOffset, is_memory=False)
+        self._doAnalytics(
+            "dump_start", addr_start=cOffset, addr_end=eOffset, is_memory=False
+        )
 
         self._ocdSendCommand("halt")
 
@@ -2001,9 +2280,9 @@ class MainApp(main.main):
                 self._ocdSendCommand(l)
 
         selPlat = const._platforms[self.cChipset.Selection]
-        
+
         cp15 = self.cmd_read_cp15(1, 0, 0, 0)
-        self.cmd_write_cp15(1, 0, 0, 0, cp15 & 0xfffffffe)
+        self.cmd_write_cp15(1, 0, 0, 0, cp15 & 0xFFFFFFFE)
 
         try:
             if not self._isInitDone:
@@ -2013,36 +2292,53 @@ class MainApp(main.main):
                     self._ocdSendCommand("soft_reset_halt")
                     self._ocdSendCommand(f"load_image $_DCC_PATH", False)
                     self._ocdSendCommand("arm core_state arm")
-                    self._ocdSendCommand(
-                        f"resume $_DCC_START_OFFSET")
+                    self._ocdSendCommand(f"resume $_DCC_START_OFFSET")
 
-                    if not self._ocdSendCommand("flash probe 0").startswith("flash 'ocl' found at"):
+                    if not self._ocdSendCommand("flash probe 0").startswith(
+                        "flash 'ocl' found at"
+                    ):
                         raise Exception("Flash probe failed!")
                     self._ocdSendCommand("flash info 0")
 
                 elif selPlat["mode"] == 1:
-                    NANDC = qcom_nandregs.MSM6250NANDController(self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u8, None,
-                                                                selPlat["flash_regs"], nand_int_clr_addr=selPlat["flash_int_clear"], nand_int_addr=selPlat["flash_int"], nand_op_reset_flag=selPlat["flash_nand_int"], msm6550_discrepancy=selPlat["flash_has_header"])
+                    NANDC = qcom_nandregs.MSM6250NANDController(
+                        self.cmd_read_u32,
+                        self.cmd_write_u32,
+                        self.cmd_read_u8,
+                        None,
+                        selPlat["flash_regs"],
+                        nand_int_clr_addr=selPlat["flash_int_clear"],
+                        nand_int_addr=selPlat["flash_int"],
+                        nand_op_reset_flag=selPlat["flash_nand_int"],
+                        msm6550_discrepancy=selPlat["flash_has_header"],
+                    )
                     assert NANDC._idcode not in [
-                        0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
+                        0x0,
+                        0xFFFFFFFF,
+                        0xFFFF0000,
+                        0xFFFF00FF,
+                    ], "NAND detect failed"
 
-                    MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
-                    DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
+                    MFR_ID_HEX = f"0x{((NANDC._idcode >> 24) & 0xff):02x}"
+                    DEV_ID_HEX = f"0x{((NANDC._idcode >> 16) & 0xff):02x}"
 
                     if self.page_width == -1:
                         if DEV_ID_HEX in self._nand_idcodes["devids"]:
                             NANDC._page_width = int(
-                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"])
+                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"]
+                            )
                     else:
                         NANDC._page_width = self.page_width
 
                     if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
                         self._logThreadQueue.put(
-                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
+                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}'
+                        )
 
                     else:
                         self._logThreadQueue.put(
-                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
+                            f"Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer"
+                        )
 
                     if DEV_ID_HEX in self._nand_idcodes["devids"]:
                         NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
@@ -2050,94 +2346,155 @@ class MainApp(main.main):
                         self._logThreadQueue.put(
                             f'Page size: {NAND_INFO["page_size"]}')
                         self._logThreadQueue.put(
-                            f'Spare size: {NAND_INFO["spare_size"]}')
+                            f'Spare size: {NAND_INFO["spare_size"]}'
+                        )
                         self._logThreadQueue.put(
-                            f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
+                            f'Flash size: {NAND_INFO["flash_size"] >> 20}MB'
+                        )
                         self._logThreadQueue.put(
-                            f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
+                            f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}'
+                        )
 
-                        assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
-                            "flash_size"], "Flash address is out of range"
+                        assert (
+                            cOffset < NAND_INFO["flash_size"]
+                            and eOffset < NAND_INFO["flash_size"]
+                        ), "Flash address is out of range"
 
                 elif selPlat["mode"] == 2:
-                    NANDC = qcom_nandregs.MSM6800NANDController(self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u8, None,
-                                                                selPlat["flash_regs"], nand_int_clr_addr=selPlat["flash_int_clear"], nand_int_addr=selPlat["flash_int"], nand_op_reset_flag=selPlat["flash_nand_int"], page_size=(-1 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), page_width=self.page_width)
+                    NANDC = qcom_nandregs.MSM6800NANDController(
+                        self.cmd_read_u32,
+                        self.cmd_write_u32,
+                        self.cmd_read_u8,
+                        None,
+                        selPlat["flash_regs"],
+                        nand_int_clr_addr=selPlat["flash_int_clear"],
+                        nand_int_addr=selPlat["flash_int"],
+                        nand_op_reset_flag=selPlat["flash_nand_int"],
+                        page_size=(
+                            -1
+                            if self.cNandSize.Selection == 2
+                            else self.cNandSize.Selection
+                        ),
+                        page_width=self.page_width,
+                    )
                     assert NANDC._idcode not in [
-                        0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
+                        0x0,
+                        0xFFFFFFFF,
+                        0xFFFF0000,
+                        0xFFFF00FF,
+                    ], "NAND detect failed"
 
-                    MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
-                    DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
+                    MFR_ID_HEX = f"0x{((NANDC._idcode >> 24) & 0xff):02x}"
+                    DEV_ID_HEX = f"0x{((NANDC._idcode >> 16) & 0xff):02x}"
 
                     if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
                         self._logThreadQueue.put(
-                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
+                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}'
+                        )
 
                     else:
                         self._logThreadQueue.put(
-                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
+                            f"Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer"
+                        )
 
                     if DEV_ID_HEX in self._nand_idcodes["devids"]:
                         NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
 
                         self._logThreadQueue.put(
-                            f'Page size: {NAND_INFO["page_size"] if not NAND_INFO["is_extended"] else (1024 << (NANDC._idcode & 0x3))}')
+                            f'Page size: {NAND_INFO["page_size"] if not NAND_INFO["is_extended"] else (1024 << (NANDC._idcode & 0x3))}'
+                        )
                         self._logThreadQueue.put(
-                            f'Spare size: {NAND_INFO["spare_size"]}')
+                            f'Spare size: {NAND_INFO["spare_size"]}'
+                        )
                         self._logThreadQueue.put(
-                            f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
+                            f'Flash size: {NAND_INFO["flash_size"] >> 20}MB'
+                        )
                         self._logThreadQueue.put(
-                            f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
+                            f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}'
+                        )
                         self._logThreadQueue.put(
-                            f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}')
+                            f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}'
+                        )
 
-                        assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
-                            "flash_size"], "Flash address is out of range"
+                        assert (
+                            cOffset < NAND_INFO["flash_size"]
+                            and eOffset < NAND_INFO["flash_size"]
+                        ), "Flash address is out of range"
 
                 elif selPlat["mode"] == 3:
                     NANDC = qcom_nandregs.MSM7200NANDController(
-                        self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u8, None, selPlat["flash_regs"], bb_in_data=self.bBadBlockinData.Value, page_size=(-1 if self.cNandSize.Selection == 2 else self.cNandSize.Selection))
+                        self.cmd_read_u32,
+                        self.cmd_write_u32,
+                        self.cmd_read_u8,
+                        None,
+                        selPlat["flash_regs"],
+                        bb_in_data=self.bBadBlockinData.Value,
+                        page_size=(
+                            -1
+                            if self.cNandSize.Selection == 2
+                            else self.cNandSize.Selection
+                        ),
+                    )
                     assert NANDC._idcode not in [
-                        0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
+                        0x0,
+                        0xFFFFFFFF,
+                        0xFFFF0000,
+                        0xFFFF00FF,
+                    ], "NAND detect failed"
 
-                    MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
-                    DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
+                    MFR_ID_HEX = f"0x{((NANDC._idcode >> 24) & 0xff):02x}"
+                    DEV_ID_HEX = f"0x{((NANDC._idcode >> 16) & 0xff):02x}"
 
                     if self.page_width == -1:
                         if DEV_ID_HEX in self._nand_idcodes["devids"]:
                             NANDC._page_width = int(
-                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"])
+                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"]
+                            )
                     else:
                         NANDC._page_width = self.page_width
 
                     if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
                         self._logThreadQueue.put(
-                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
+                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}'
+                        )
 
                     else:
                         self._logThreadQueue.put(
-                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
+                            f"Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer"
+                        )
 
                     if DEV_ID_HEX in self._nand_idcodes["devids"]:
                         NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
 
                         self._logThreadQueue.put(
-                            f'Page size: {NAND_INFO["page_size"] if not NAND_INFO["is_extended"] else (1024 << (NANDC._idcode & 0x3))}')
+                            f'Page size: {NAND_INFO["page_size"] if not NAND_INFO["is_extended"] else (1024 << (NANDC._idcode & 0x3))}'
+                        )
                         self._logThreadQueue.put(
-                            f'Spare size: {NAND_INFO["spare_size"]}')
+                            f'Spare size: {NAND_INFO["spare_size"]}'
+                        )
                         self._logThreadQueue.put(
-                            f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
+                            f'Flash size: {NAND_INFO["flash_size"] >> 20}MB'
+                        )
                         self._logThreadQueue.put(
-                            f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
+                            f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}'
+                        )
                         self._logThreadQueue.put(
-                            f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}')
+                            f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}'
+                        )
 
-                        assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
-                            "flash_size"], "Flash address is out of range"
+                        assert (
+                            cOffset < NAND_INFO["flash_size"]
+                            and eOffset < NAND_INFO["flash_size"]
+                        ), "Flash address is out of range"
 
                 elif selPlat["mode"] == 4:
-                    assert cOffset >= self._cfi_start_offset, f"Read address must be greater or equal than {hex(self._cfi_start_offset)}"
+                    assert (
+                        cOffset >= self._cfi_start_offset
+                    ), f"Read address must be greater or equal than {hex(self._cfi_start_offset)}"
 
-                    if not self._ocdSendCommand("flash probe 0").startswith("flash 'cfi' found at"):
+                    if not self._ocdSendCommand("flash probe 0").startswith(
+                        "flash 'cfi' found at"
+                    ):
                         raise Exception("Flash probe failed!")
                     self._ocdSendCommand("flash info 0")
 
@@ -2148,132 +2505,387 @@ class MainApp(main.main):
 
                 elif selPlat["mode"] == 5:
                     if selPlat["mode"]["reg_width"] == 0:
-                        NANDC = common_nandregs.GenericNANDController(self.cmd_write_u8, self.cmd_read_u8, self.cmd_write_u8, "big" if self.cTarget.Selection >= self._beTarget else "little",
-                                                                      self.cmd_read_u32, selPlat["flash_cmd"], selPlat["flash_addr"], selPlat["flash_buffer"], selPlat["flash_wait"], selPlat["wait_mask"], (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), 0)
+                        NANDC = common_nandregs.GenericNANDController(
+                            self.cmd_write_u8,
+                            self.cmd_read_u8,
+                            self.cmd_write_u8,
+                            "big"
+                            if self.cTarget.Selection >= self._beTarget
+                            else "little",
+                            self.cmd_read_u32,
+                            selPlat["flash_cmd"],
+                            selPlat["flash_addr"],
+                            selPlat["flash_buffer"],
+                            selPlat["flash_wait"],
+                            selPlat["wait_mask"],
+                            (
+                                0
+                                if self.cNandSize.Selection == 2
+                                else self.cNandSize.Selection
+                            ),
+                            0,
+                        )
 
                     elif selPlat["mode"]["reg_width"] == 1:
-                        NANDC = common_nandregs.GenericNANDController(self.cmd_write_u8, self.cmd_read_u16, self.cmd_write_u16, "big" if self.cTarget.Selection >= self._beTarget else "little",
-                                                                      self.cmd_read_u32, selPlat["flash_cmd"], selPlat["flash_addr"], selPlat["flash_buffer"], selPlat["flash_wait"], selPlat["wait_mask"], (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), 1)
+                        NANDC = common_nandregs.GenericNANDController(
+                            self.cmd_write_u8,
+                            self.cmd_read_u16,
+                            self.cmd_write_u16,
+                            "big"
+                            if self.cTarget.Selection >= self._beTarget
+                            else "little",
+                            self.cmd_read_u32,
+                            selPlat["flash_cmd"],
+                            selPlat["flash_addr"],
+                            selPlat["flash_buffer"],
+                            selPlat["flash_wait"],
+                            selPlat["wait_mask"],
+                            (
+                                0
+                                if self.cNandSize.Selection == 2
+                                else self.cNandSize.Selection
+                            ),
+                            1,
+                        )
 
                     elif selPlat["mode"]["reg_width"] == 2:
-                        NANDC = common_nandregs.GenericNANDController(self.cmd_write_u16, self.cmd_read_u16, self.cmd_write_u16, "big" if self.cTarget.Selection >= self._beTarget else "little",
-                                                                      self.cmd_read_u32, selPlat["flash_cmd"], selPlat["flash_addr"], selPlat["flash_buffer"], selPlat["flash_wait"], selPlat["wait_mask"], (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), 0)
+                        NANDC = common_nandregs.GenericNANDController(
+                            self.cmd_write_u16,
+                            self.cmd_read_u16,
+                            self.cmd_write_u16,
+                            "big"
+                            if self.cTarget.Selection >= self._beTarget
+                            else "little",
+                            self.cmd_read_u32,
+                            selPlat["flash_cmd"],
+                            selPlat["flash_addr"],
+                            selPlat["flash_buffer"],
+                            selPlat["flash_wait"],
+                            selPlat["wait_mask"],
+                            (
+                                0
+                                if self.cNandSize.Selection == 2
+                                else self.cNandSize.Selection
+                            ),
+                            0,
+                        )
 
                     elif selPlat["mode"]["reg_width"] == 4:
-                        NANDC = common_nandregs.GenericNANDController(self.cmd_write_u32, self.cmd_read_u32, self.cmd_write_u32, "big" if self.cTarget.Selection >= self._beTarget else "little",
-                                                                      self.cmd_read_u32, selPlat["flash_cmd"], selPlat["flash_addr"], selPlat["flash_buffer"], selPlat["flash_wait"], selPlat["wait_mask"], (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection), 0)
+                        NANDC = common_nandregs.GenericNANDController(
+                            self.cmd_write_u32,
+                            self.cmd_read_u32,
+                            self.cmd_write_u32,
+                            "big"
+                            if self.cTarget.Selection >= self._beTarget
+                            else "little",
+                            self.cmd_read_u32,
+                            selPlat["flash_cmd"],
+                            selPlat["flash_addr"],
+                            selPlat["flash_buffer"],
+                            selPlat["flash_wait"],
+                            selPlat["wait_mask"],
+                            (
+                                0
+                                if self.cNandSize.Selection == 2
+                                else self.cNandSize.Selection
+                            ),
+                            0,
+                        )
+
+                    elif selPlat["mode"]["reg_width"] == 5:
+                        NANDC = common_nandregs.GenericNANDController(
+                            self.cmd_write_u32,
+                            self.cmd_read_u32,
+                            self.cmd_write_u32,
+                            "big"
+                            if self.cTarget.Selection >= self._beTarget
+                            else "little",
+                            self.cmd_read_u32,
+                            selPlat["flash_cmd"],
+                            selPlat["flash_addr"],
+                            selPlat["flash_buffer"],
+                            selPlat["flash_wait"],
+                            selPlat["wait_mask"],
+                            (
+                                0
+                                if self.cNandSize.Selection == 2
+                                else self.cNandSize.Selection
+                            ),
+                            0,
+                            True,
+                        )
 
                     _msleep(const._jtag_init_delay)
 
                     assert NANDC._idcode not in [
-                        0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
+                        0x0,
+                        0xFFFFFFFF,
+                        0xFFFF0000,
+                        0xFFFF00FF,
+                    ], "NAND detect failed"
 
-                    MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
-                    DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
+                    MFR_ID_HEX = f"0x{((NANDC._idcode >> 24) & 0xff):02x}"
+                    DEV_ID_HEX = f"0x{((NANDC._idcode >> 16) & 0xff):02x}"
 
                     if self.page_width == -1:
                         if DEV_ID_HEX in self._nand_idcodes["devids"]:
                             NANDC._page_width = int(
-                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"])
+                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"]
+                            )
                     else:
                         NANDC._page_width = self.page_width
 
                     if self.cNandSize.Selection == 2:
                         if DEV_ID_HEX in self._nand_idcodes["devids"]:
                             NANDC._page_size = int(
-                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_extended"])
+                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_extended"]
+                            )
 
                     if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
                         self._logThreadQueue.put(
-                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
+                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}'
+                        )
 
                     else:
                         self._logThreadQueue.put(
-                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
+                            f"Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer"
+                        )
 
                     if DEV_ID_HEX in self._nand_idcodes["devids"]:
                         NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
 
                         self._logThreadQueue.put(
-                            f'Page size: {NAND_INFO["page_size"] if not NAND_INFO["is_extended"] else (1024 << (NANDC._idcode & 0x3))}')
+                            f'Page size: {NAND_INFO["page_size"] if not NAND_INFO["is_extended"] else (1024 << (NANDC._idcode & 0x3))}'
+                        )
                         self._logThreadQueue.put(
-                            f'Spare size: {NAND_INFO["spare_size"]}')
+                            f'Spare size: {NAND_INFO["spare_size"]}'
+                        )
                         self._logThreadQueue.put(
-                            f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
+                            f'Flash size: {NAND_INFO["flash_size"] >> 20}MB'
+                        )
                         self._logThreadQueue.put(
-                            f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
+                            f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}'
+                        )
                         self._logThreadQueue.put(
-                            f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}')
+                            f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}'
+                        )
 
-                        assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
-                            "flash_size"], "Flash address is out of range"
+                        assert (
+                            cOffset < NAND_INFO["flash_size"]
+                            and eOffset < NAND_INFO["flash_size"]
+                        ), "Flash address is out of range"
 
-                elif selPlat["mode"] == 7:
-                    NANDC = common_nandregs.OneNANDController(self.cmd_read_u16, self.cmd_write_u16, self.cmd_read_u8,
-                                                              self.cmd_write_u8, selPlat["o1n_offset"] if "o1n_offset" in selPlat else baseO1N, (0 if self.cNandSize.Selection == 2 else self.cNandSize.Selection))
+                elif selPlat["mode"] == 9:
+                    if selPlat["mode"]["reg_width"] == 1:
+                        DATA_READ = self.cmd_read_u8
+                        DATA_WRITE = self.cmd_write_u8
+
+                    elif selPlat["mode"]["reg_width"] == 2:
+                        DATA_READ = self.cmd_read_u16
+                        DATA_WRITE = self.cmd_write_u16
+
+                    elif selPlat["mode"]["reg_width"] == 4:
+                        DATA_READ = self.cmd_read_u32
+                        DATA_WRITE = self.cmd_write_u32
+
+                    if selPlat["mode"]["gpio_width"] == 1:
+                        GP_READ = self.cmd_read_u8
+                        GP_WRITE = self.cmd_write_u8
+
+                    elif selPlat["mode"]["gpio_width"] == 2:
+                        GP_READ = self.cmd_read_u16
+                        GP_WRITE = self.cmd_write_u16
+
+                    elif selPlat["mode"]["gpio_width"] in [4, 5]:
+                        GP_READ = self.cmd_read_u32
+                        GP_WRITE = self.cmd_write_u32
+
+                    NANDC = common_nandregs.GenericNANDControllerGPIO(
+                        GP_READ,
+                        GP_WRITE,
+                        DATA_READ,
+                        DATA_WRITE,
+                        "big" if self.cTarget.Selection >= self._beTarget else "little",
+                        selPlat["flash_latch"],
+                        selPlat["flash_buffer"],
+                        selPlat["cle_mask"],
+                        selPlat["ale_mask"],
+                        selPlat["flash_wait"],
+                        selPlat["wait_mask"],
+                        (
+                            0
+                            if self.cNandSize.Selection == 2
+                            else self.cNandSize.Selection
+                        ),
+                        0,
+                        selPlat["mode"]["gpio_width"] == 5,
+                    )
+
+                    _msleep(const._jtag_init_delay)
 
                     assert NANDC._idcode not in [
-                        0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
+                        0x0,
+                        0xFFFFFFFF,
+                        0xFFFF0000,
+                        0xFFFF00FF,
+                    ], "NAND detect failed"
 
-                    MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
+                    MFR_ID_HEX = f"0x{((NANDC._idcode >> 24) & 0xff):02x}"
+                    DEV_ID_HEX = f"0x{((NANDC._idcode >> 16) & 0xff):02x}"
+
+                    if self.page_width == -1:
+                        if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                            NANDC._page_width = int(
+                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"]
+                            )
+                    else:
+                        NANDC._page_width = self.page_width
+
+                    if self.cNandSize.Selection == 2:
+                        if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                            NANDC._page_size = int(
+                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_extended"]
+                            )
 
                     if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
                         self._logThreadQueue.put(
-                            f'Found OneNAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
+                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}'
+                        )
 
                     else:
                         self._logThreadQueue.put(
-                            f'Found OneNAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
+                            f"Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer"
+                        )
+
+                    if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                        NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
+
+                        self._logThreadQueue.put(
+                            f'Page size: {NAND_INFO["page_size"] if not NAND_INFO["is_extended"] else (1024 << (NANDC._idcode & 0x3))}'
+                        )
+                        self._logThreadQueue.put(
+                            f'Spare size: {NAND_INFO["spare_size"]}'
+                        )
+                        self._logThreadQueue.put(
+                            f'Flash size: {NAND_INFO["flash_size"] >> 20}MB'
+                        )
+                        self._logThreadQueue.put(
+                            f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}'
+                        )
+                        self._logThreadQueue.put(
+                            f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}'
+                        )
+
+                        assert (
+                            cOffset < NAND_INFO["flash_size"]
+                            and eOffset < NAND_INFO["flash_size"]
+                        ), "Flash address is out of range"
+
+                elif selPlat["mode"] == 7:
+                    NANDC = common_nandregs.OneNANDController(
+                        self.cmd_read_u16,
+                        self.cmd_write_u16,
+                        self.cmd_read_u8,
+                        self.cmd_write_u8,
+                        selPlat["o1n_offset"] if "o1n_offset" in selPlat else baseO1N,
+                        (
+                            0
+                            if self.cNandSize.Selection == 2
+                            else self.cNandSize.Selection
+                        ),
+                    )
+
+                    assert NANDC._idcode not in [
+                        0x0,
+                        0xFFFFFFFF,
+                        0xFFFF0000,
+                        0xFFFF00FF,
+                    ], "NAND detect failed"
+
+                    MFR_ID_HEX = f"0x{((NANDC._idcode >> 24) & 0xff):02x}"
+
+                    if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
+                        self._logThreadQueue.put(
+                            f'Found OneNAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}'
+                        )
+
+                    else:
+                        self._logThreadQueue.put(
+                            f"Found OneNAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer"
+                        )
 
                     self._logThreadQueue.put(
                         f"Flash size: {NANDC._density >> 3}MB")
 
                     assert cOffset < (NANDC._density << 17) and eOffset < (
-                        NANDC._density << 17), "Flash address is out of range"
+                        NANDC._density << 17
+                    ), "Flash address is out of range"
 
                 elif selPlat["mode"] == 8:
-                    NANDC = bcm_nandregs.BCM2133NANDController(self.cmd_read_u32, self.cmd_write_u32, self.cmd_read_u16, self.cmd_write_u16, self.cmd_read_u8, self.cmd_write_u8,
-                                                               page_width=self.page_width)
+                    NANDC = bcm_nandregs.BCM2133NANDController(
+                        self.cmd_read_u32,
+                        self.cmd_write_u32,
+                        self.cmd_read_u16,
+                        self.cmd_write_u16,
+                        self.cmd_read_u8,
+                        self.cmd_write_u8,
+                        page_width=self.page_width,
+                    )
                     assert NANDC._idcode not in [
-                        0x0, 0xffffffff, 0xffff0000, 0xffff00ff], "NAND detect failed"
+                        0x0,
+                        0xFFFFFFFF,
+                        0xFFFF0000,
+                        0xFFFF00FF,
+                    ], "NAND detect failed"
 
-                    MFR_ID_HEX = f'0x{((NANDC._idcode >> 24) & 0xff):02x}'
-                    DEV_ID_HEX = f'0x{((NANDC._idcode >> 16) & 0xff):02x}'
+                    MFR_ID_HEX = f"0x{((NANDC._idcode >> 24) & 0xff):02x}"
+                    DEV_ID_HEX = f"0x{((NANDC._idcode >> 16) & 0xff):02x}"
 
                     if self.page_width == -1:
                         if DEV_ID_HEX in self._nand_idcodes["devids"]:
                             NANDC._page_width = int(
-                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"])
+                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"]
+                            )
 
                     if self.cNandSize.Selection == 2:
                         if DEV_ID_HEX in self._nand_idcodes["devids"]:
                             NANDC._page_size = int(
-                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_extended"])
+                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_extended"]
+                            )
 
                     if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
                         self._logThreadQueue.put(
-                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}')
+                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}'
+                        )
 
                     else:
                         self._logThreadQueue.put(
-                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer')
+                            f"Found NAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer"
+                        )
 
                     if DEV_ID_HEX in self._nand_idcodes["devids"]:
                         NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
 
                         self._logThreadQueue.put(
-                            f'Page size: {NAND_INFO["page_size"] if not NAND_INFO["is_extended"] else (1024 << (NANDC._idcode & 0x3))}')
+                            f'Page size: {NAND_INFO["page_size"] if not NAND_INFO["is_extended"] else (1024 << (NANDC._idcode & 0x3))}'
+                        )
                         self._logThreadQueue.put(
-                            f'Spare size: {NAND_INFO["spare_size"]}')
+                            f'Spare size: {NAND_INFO["spare_size"]}'
+                        )
                         self._logThreadQueue.put(
-                            f'Flash size: {NAND_INFO["flash_size"] >> 20}MB')
+                            f'Flash size: {NAND_INFO["flash_size"] >> 20}MB'
+                        )
                         self._logThreadQueue.put(
-                            f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}')
+                            f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}'
+                        )
                         self._logThreadQueue.put(
-                            f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}')
+                            f'Extended ID: {"none" if not NAND_INFO["is_extended"] else (NANDC._idcode & 0xff)}'
+                        )
 
-                        assert cOffset < NAND_INFO["flash_size"] and eOffset < NAND_INFO[
-                            "flash_size"], "Flash address is out of range"
+                        assert (
+                            cOffset < NAND_INFO["flash_size"]
+                            and eOffset < NAND_INFO["flash_size"]
+                        ), "Flash address is out of range"
 
                 if NANDC is None:
                     self._isInitDone = True
@@ -2283,7 +2895,8 @@ class MainApp(main.main):
             time.sleep(1)
             self._logSupressed = True
             self._logThreadQueue.put(
-                f"Dump flash started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
+                f"Dump flash started {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
 
             if self._isConnectRemote and self._sio:
                 self._sio.emit("command", {"c": "isSupressed", "d": True})
@@ -2293,112 +2906,287 @@ class MainApp(main.main):
             with open(name, "wb") as tempFile:
                 sOffset = cOffset
 
-                if not self.check_identical_reads:                
+                if not self.check_identical_reads:
                     while cOffset < eOffset and not self._isReadCanceled:
                         if self._loaded_dcc is not None or selPlat["mode"] in [-1, 4]:
-                            tempFile.write(self.cmd_read_flash(
-                                cOffset - self._cfi_start_offset, min(CFI_READ_BUFFER, eOffset - cOffset)))
+                            tempFile.write(
+                                self.cmd_read_flash(
+                                    cOffset - self._cfi_start_offset,
+                                    min(CFI_READ_BUFFER, eOffset - cOffset),
+                                )
+                            )
                             cOffset += min(CFI_READ_BUFFER, eOffset - cOffset)
 
                         elif NANDC is not None:
-                            data, spare, bbm = NANDC.read(cOffset >> ((11 if self.cNandSize.Selection == 1 else 9) if selPlat["mode"] != 7 else (
-                                12 if self.cNandSize.Selection == 1 else 11)))
+                            data, spare, bbm = NANDC.read(
+                                cOffset
+                                >> (
+                                    (11 if self.cNandSize.Selection == 1 else 9)
+                                    if selPlat["mode"] != 7
+                                    else (12 if self.cNandSize.Selection == 1 else 11)
+                                )
+                            )
 
                             tempFile.write(data)
                             spareBuf += spare
                             bbBuf += bbm
 
-                            cOffset += (0x800 if self.cNandSize.Selection == 1 else 0x200) if selPlat["mode"] != 7 else (
-                                0x1000 if self.cNandSize.Selection == 1 else 0x800)
+                            cOffset += (
+                                (0x800 if self.cNandSize.Selection == 1 else 0x200)
+                                if selPlat["mode"] != 7
+                                else (
+                                    0x1000 if self.cNandSize.Selection == 1 else 0x800
+                                )
+                            )
 
                         else:
                             raise NotImplementedError()
 
-                        self._progMsgQueue.put(cOffset/eOffset)
+                        self._progMsgQueue.put(cOffset / eOffset)
 
                 else:
-                    if self.identical_check_mode == 0:                        
+                    if self.identical_check_mode == 0:
+                        inconsistentReads = []
+
                         while cOffset < eOffset and not self._isReadCanceled:
                             checkTemp = []
                             checkTempHash = []
 
-                            if self._loaded_dcc is not None or selPlat["mode"] in [-1, 4]:
+                            isInconsistent = True
+
+                            if self._loaded_dcc is not None or selPlat["mode"] in [
+                                -1,
+                                4,
+                            ]:
                                 for _ in range(self.max_read_pass):
                                     tempData = self.cmd_read_flash(
-                                        cOffset - self._cfi_start_offset, min(CFI_READ_BUFFER, eOffset - cOffset))
-                                    tempHash = hashlib.sha256(tempData).hexdigest()
-                                    
+                                        cOffset - self._cfi_start_offset,
+                                        min(CFI_READ_BUFFER, eOffset - cOffset),
+                                    )
+                                    tempHash = hashlib.sha256(
+                                        tempData).hexdigest()
+
                                     checkTemp.append(tempData)
                                     checkTempHash.append(tempHash)
 
-                                    if checkTempHash.count(tempHash) >= self.max_identical_read:
+                                    if (
+                                        checkTempHash.count(tempHash)
+                                        >= self.max_identical_read
+                                    ):
+                                        isInconsistent = False
                                         break
 
+                                if isInconsistent:
+                                    inconsistentReads.append(cOffset)
                                 tempFile.write(tempData)
-                                cOffset += min(CFI_READ_BUFFER, eOffset - cOffset)
+                                cOffset += min(CFI_READ_BUFFER,
+                                               eOffset - cOffset)
 
                             elif NANDC is not None:
                                 for _ in range(self.max_read_pass):
-                                    data, spare, bbm = NANDC.read(cOffset >> ((11 if self.cNandSize.Selection == 1 else 9) if selPlat["mode"] != 7 else (
-                                    12 if self.cNandSize.Selection == 1 else 11)))
+                                    data, spare, bbm = NANDC.read(
+                                        cOffset
+                                        >> (
+                                            (11 if self.cNandSize.Selection == 1 else 9)
+                                            if selPlat["mode"] != 7
+                                            else (
+                                                12
+                                                if self.cNandSize.Selection == 1
+                                                else 11
+                                            )
+                                        )
+                                    )
 
                                     tempData = data + spare + bbm
-                                    tempHash = hashlib.sha256(tempData).hexdigest()
+                                    tempHash = hashlib.sha256(
+                                        tempData).hexdigest()
 
                                     checkTemp.append(tempData)
                                     checkTempHash.append(tempHash)
 
-                                    if checkTempHash.count(tempHash) >= self.max_identical_read:
+                                    if (
+                                        checkTempHash.count(tempHash)
+                                        >= self.max_identical_read
+                                    ):
+                                        isInconsistent = False
                                         break
 
+                                if isInconsistent:
+                                    inconsistentReads.append(cOffset)
                                 tempFile.write(data)
                                 spareBuf += spare
                                 bbBuf += bbm
 
-                                cOffset += (0x800 if self.cNandSize.Selection == 1 else 0x200) if selPlat["mode"] != 7 else (
-                                    0x1000 if self.cNandSize.Selection == 1 else 0x800)
+                                cOffset += (
+                                    (0x800 if self.cNandSize.Selection == 1 else 0x200)
+                                    if selPlat["mode"] != 7
+                                    else (
+                                        0x1000
+                                        if self.cNandSize.Selection == 1
+                                        else 0x800
+                                    )
+                                )
 
                             else:
                                 raise NotImplementedError()
 
-                            self._progMsgQueue.put(cOffset/eOffset)
+                            self._progMsgQueue.put(cOffset / eOffset)
+
+                        if len(inconsistentReads) >= 1:
+                            self._logThreadQueue.put(
+                                f"Inconsistent reads: {' '.join([hex(x) for x in inconsistentReads])}"
+                            )
 
                     elif self.identical_check_mode == 1:
-                        raise NotImplementedError("TODO")
+                        tempFilesHash = []
 
-                        for _ in range(self.max_identical_read):
-                            if self._isReadCanceled: break
+                        for c in range(self.max_read_pass):
+                            if self._isReadCanceled:
+                                break
 
                             spareBuf.clear()
                             bbBuf.clear()
-                            cOffset = sOffset                            
+                            cOffset = sOffset
 
-                            while cOffset < eOffset and not self._isReadCanceled:
-                                if self._loaded_dcc is not None or selPlat["mode"] in [-1, 4]:
-                                    tempFile.write(self.cmd_read_flash(
-                                        cOffset - self._cfi_start_offset, min(CFI_READ_BUFFER, eOffset - cOffset)))
-                                    cOffset += min(CFI_READ_BUFFER, eOffset - cOffset)
+                            with tempfile.TemporaryFile(
+                                prefix="dumpit_", suffix=".bin"
+                            ) as tempFileTemp:
+                                while cOffset < eOffset and not self._isReadCanceled:
+                                    if self._loaded_dcc is not None or selPlat[
+                                        "mode"
+                                    ] in [-1, 4]:
+                                        tempFileTemp.write(
+                                            self.cmd_read_flash(
+                                                cOffset - self._cfi_start_offset,
+                                                min(CFI_READ_BUFFER,
+                                                    eOffset - cOffset),
+                                            )
+                                        )
+                                        cOffset += min(
+                                            CFI_READ_BUFFER, eOffset - cOffset
+                                        )
 
-                                elif NANDC is not None:
-                                    data, spare, bbm = NANDC.read(cOffset >> ((11 if self.cNandSize.Selection == 1 else 9) if selPlat["mode"] != 7 else (
-                                        12 if self.cNandSize.Selection == 1 else 11)))
+                                    elif NANDC is not None:
+                                        data, spare, bbm = NANDC.read(
+                                            cOffset
+                                            >> (
+                                                (
+                                                    11
+                                                    if self.cNandSize.Selection == 1
+                                                    else 9
+                                                )
+                                                if selPlat["mode"] != 7
+                                                else (
+                                                    12
+                                                    if self.cNandSize.Selection == 1
+                                                    else 11
+                                                )
+                                            )
+                                        )
 
-                                    tempFile.write(data)
-                                    spareBuf += spare
-                                    bbBuf += bbm
+                                        tempFileTemp.write(data)
+                                        spareBuf += spare
+                                        bbBuf += bbm
 
-                                    cOffset += (0x800 if self.cNandSize.Selection == 1 else 0x200) if selPlat["mode"] != 7 else (
-                                        0x1000 if self.cNandSize.Selection == 1 else 0x800)
+                                        cOffset += (
+                                            (
+                                                0x800
+                                                if self.cNandSize.Selection == 1
+                                                else 0x200
+                                            )
+                                            if selPlat["mode"] != 7
+                                            else (
+                                                0x1000
+                                                if self.cNandSize.Selection == 1
+                                                else 0x800
+                                            )
+                                        )
 
-                                else:
-                                    raise NotImplementedError()
+                                    else:
+                                        raise NotImplementedError()
 
-                                self._progMsgQueue.put(cOffset/eOffset)
+                                    self._progMsgQueue.put(cOffset / eOffset)
 
-                tempFile.write(spareBuf + bbBuf)
+                                if self._isReadCanceled:
+                                    break
+
+                                end = tempFileTemp.tell()
+
+                                tempFileTemp.seek(0)
+                                tempHashInst = hashlib.sha256(tempData)
+
+                                while tempFileTemp.tell() < end:
+                                    tempHashInst.update(
+                                        tempFileTemp.read(0x200))
+
+                                tempHash = tempHashInst.hexdigest()
+                                tempFilesHash.append(tempHash)
+
+                                if (
+                                    tempFilesHash.count(tempHash)
+                                    >= self.max_identical_read
+                                ):
+                                    self._logThreadQueue.put(
+                                        f"This dump is consistent for {self.max_identical_read} consecutive times"
+                                    )
+                                    tempFileTemp.seek(0)
+                                    while tempFileTemp.tell() < end:
+                                        tempFile.write(
+                                            tempFileTemp.read(0x8000))
+                                    break
+
+                                elif c >= (self.max_read_pass - 1):
+                                    tempFileTemp.seek(0)
+                                    while tempFileTemp.tell() < end:
+                                        tempFile.write(
+                                            tempFileTemp.read(0x8000))
+
+                spare_start_offset = tempFile.tell()
+                tempFile.write(spareBuf)
+                bbm_start_offset = tempFile.tell()
+                tempFile.write(bbBuf)
                 self._logThreadQueue.put(
-                    f"Dump flash finished {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}")
-                # tempFile.write() # TODO: Write Dumpit Device Footer format
+                    f"Dump flash finished {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+
+                if not self.metadata["ignore_metadata"]:
+                    tempFile.write(
+                        self._generateMetadata(
+                            [
+                                {
+                                    "name": "FLASH",
+                                    "flash_offset": sOffset,
+                                    "data_offset": 0x00,
+                                    "data_size": spare_start_offset,
+                                    "spare_offset": spare_start_offset,
+                                    "spare_size": len(spareBuf),
+                                    "bbm_offset": bbm_start_offset,
+                                    "bbm_size": len(bbBuf),
+                                }
+                            ],
+                            self.metadata["device_name"],
+                            self.metadata["device_manufacturer"],
+                            (
+                                (0x1000 if (selPlat["mode"] == 7) else 0x800)
+                                if (NANDC is not None and NANDC._page_size == 1)
+                                else (0x800 if (selPlat["mode"] == 7) else 0x200)
+                            ),
+                            self.idcode,
+                            (
+                                0
+                                if NANDC is None
+                                else (2 if selPlat["mode"] == 7 else 1)
+                            ),
+                            self.remotePerformer
+                            if self._isConnectRemote
+                            else self.metadata["performer"],
+                            self.metadata["device_version"],
+                            self.remoteAssistant if self._isConnectRemote else "",
+                            self.remoteLender
+                            if self._isConnectRemote
+                            else self.metadata["lender"],
+                        )
+                    )
 
         except Exception as e:
             traceback.print_exc()
@@ -2417,8 +3205,59 @@ class MainApp(main.main):
             if self._isConnectRemote and self._sio:
                 self._sio.emit("command", {"c": "isSupressed", "d": False})
 
-            self._doAnalytics("dump_end", addr_start=cOffset,
-                              addr_end=eOffset, is_memory=False)
+            self._doAnalytics(
+                "dump_end", addr_start=cOffset, addr_end=eOffset, is_memory=False
+            )
+
+    def _generateMetadata(
+        self,
+        regions: typing.List[dict],
+        device_name: str,
+        manufacturer: str,
+        chip_size: int,
+        idcode: int,
+        flash_type: int,
+        performer: str,
+        device_version: str = "",
+        assistant: str = "",
+        lender: str = "",
+    ):
+        tempDump = io.BytesIO(bytes(4096))
+        tempDump.seek(0)
+
+        tempDump.write(b"DUMPINFO")
+        tempDump.write(struct.pack("<LL", 1, len(regions)))
+
+        def _packString(data: str):
+            tempDump.write(
+                struct.pack("<L", len(data.encode("utf-8"))) +
+                data.encode("utf-8")
+            )
+
+        for r in regions:
+            _packString(r["name"])
+            tempDump.write(
+                struct.pack(
+                    "<LLLLLLL",
+                    r["flash_offset"],
+                    r["data_offset"],
+                    r["data_size"],
+                    r["spare_offset"],
+                    r["spare_size"],
+                    r["bbm_offset"],
+                    r["bbm_size"],
+                )
+            )
+
+        _packString(manufacturer)
+        _packString(device_name)
+        _packString(device_version)
+        tempDump.write(struct.pack("<LLL", chip_size, idcode, flash_type))
+        _packString(performer)
+        _packString(assistant)
+        _packString(lender)
+
+        return tempDump.getvalue()
 
     def doReadFlash(self, event):
         if (not self._isConnect and not self._isConnectRemote) or self._isRead:
@@ -2428,15 +3267,30 @@ class MainApp(main.main):
         eOffset = int(self.tEnd.Value, 16)
 
         if cOffset >= eOffset:
-            return wx.MessageBox(f"start offset must be less than end offset", "Dumpit", wx.OK | wx.CENTER | wx.ICON_ERROR, self)
+            return wx.MessageBox(
+                f"start offset must be less than end offset",
+                "Dumpit",
+                wx.OK | wx.CENTER | wx.ICON_ERROR,
+                self,
+            )
 
-        flash_div = (0x800 if self.cNandSize.Selection == 1 else 0x200) if const._platforms[self.cChipset.Selection]["mode"] != 7 else (
-            0x1000 if self.cNandSize.Selection == 1 else 0x800)
+        flash_div = (
+            (0x800 if self.cNandSize.Selection == 1 else 0x200)
+            if const._platforms[self.cChipset.Selection]["mode"] != 7
+            else (0x1000 if self.cNandSize.Selection == 1 else 0x800)
+        )
 
         if (cOffset % flash_div) != 0 or (eOffset % flash_div) != 0:
-            return wx.MessageBox(f"offset not divisible by {hex(flash_div)} is not supported", "Dumpit", wx.OK | wx.CENTER | wx.ICON_ERROR, self)
+            return wx.MessageBox(
+                f"offset not divisible by {hex(flash_div)} is not supported",
+                "Dumpit",
+                wx.OK | wx.CENTER | wx.ICON_ERROR,
+                self,
+            )
 
-        with wx.FileDialog(self, "Dump flash", wildcard="Binary file|*.bin", style=wx.FD_SAVE) as fd:
+        with wx.FileDialog(
+            self, "Dump flash", wildcard="Binary file|*.bin", style=wx.FD_SAVE
+        ) as fd:
             fd: wx.FileDialog
             if fd.ShowModal() != wx.ID_CANCEL:
                 self.progress.Value = 0
@@ -2445,9 +3299,14 @@ class MainApp(main.main):
 
                 O1N_INPUT_OFFSET = -1
 
-                if const._platforms[self.cChipset.Selection]["mode"] == 7 and "o1n_offset" not in const._platforms[self.cChipset.Selection]:
+                if (
+                    const._platforms[self.cChipset.Selection]["mode"] == 7
+                    and "o1n_offset" not in const._platforms[self.cChipset.Selection]
+                ):
                     try:
-                        with wx.TextEntryDialog(self, "Enter OneNAND base offset", "Dumpit") as t:
+                        with wx.TextEntryDialog(
+                            self, "Enter OneNAND base offset", "Dumpit"
+                        ) as t:
                             t: wx.TextEntryDialog
                             if t.ShowModal() == wx.ID_CANCEL:
                                 return
@@ -2455,12 +3314,15 @@ class MainApp(main.main):
                             O1N_INPUT_OFFSET = int(t.Value, 16)
 
                     except Exception as e:
-                        wx.MessageBox(str(e), "Dumpit", wx.OK |
-                                      wx.CENTER | wx.ICON_ERROR, self)
+                        wx.MessageBox(
+                            str(e), "Dumpit", wx.OK | wx.CENTER | wx.ICON_ERROR, self
+                        )
                         return
 
-                self._dumpThread = threading.Thread(target=self.doReadFlashThread, args=(
-                    fd.GetPath(), cOffset, eOffset, O1N_INPUT_OFFSET))
+                self._dumpThread = threading.Thread(
+                    target=self.doReadFlashThread,
+                    args=(fd.GetPath(), cOffset, eOffset, O1N_INPUT_OFFSET),
+                )
                 self._dumpThread.daemon = True
 
                 self._dumpThread.start()
@@ -2500,7 +3362,9 @@ class MainApp(main.main):
         self._ocdSendCommand("reset init")
 
     def doLoader(self, event):
-        with wx.FileDialog(self, "Load DCC", wildcard="DCC Hex file|*.hex", style=wx.FD_OPEN) as fd:
+        with wx.FileDialog(
+            self, "Load DCC", wildcard="DCC Hex file|*.hex", style=wx.FD_OPEN
+        ) as fd:
             fd: wx.FileDialog
             if fd.ShowModal() != wx.ID_CANCEL:
                 self._loaded_dcc = fd.GetPath()
@@ -2509,9 +3373,13 @@ class MainApp(main.main):
 
             self.lCurrentDCC.SetLabel(f"DCC Loader: {self._loaded_dcc}")
 
-            path_escaped = self._loaded_dcc.replace('\\', '/')
-            self._ocdSendCommand("set _DCC_PATH {" + path_escaped + "}; " +
-                                 f"set _DCC_START_OFFSET {hex(intelhex.IntelHex(self._loaded_dcc).minaddr())}")
+            path_escaped = self._loaded_dcc.replace("\\", "/")
+            self._ocdSendCommand(
+                "set _DCC_PATH {"
+                + path_escaped
+                + "}; "
+                + f"set _DCC_START_OFFSET {hex(intelhex.IntelHex(self._loaded_dcc).minaddr())}"
+            )
 
     def doScript(self, event):
         event.Skip()
@@ -2520,7 +3388,7 @@ class MainApp(main.main):
         if not self._isConnect and not self._isConnectRemote:
             return
         cp15 = self.cmd_read_cp15(1, 0, 0, 0)
-        self.cmd_write_cp15(1, 0, 0, 0, cp15 & 0xfffffffe)
+        self.cmd_write_cp15(1, 0, 0, 0, cp15 & 0xFFFFFFFE)
 
     def doEnableMMU(self, event):
         if not self._isConnect and not self._isConnectRemote:
@@ -2580,8 +3448,9 @@ class MainApp(main.main):
         FT232HConfig(self).ShowModal()
 
     def doOpenGPIODConfig(self, event):
-        wx.MessageBox("Not implemented", "Dumpit", wx.OK |
-                      wx.CENTER | wx.ICON_ERROR, self)
+        wx.MessageBox(
+            "Not implemented", "Dumpit", wx.OK | wx.CENTER | wx.ICON_ERROR, self
+        )
 
     def doFT232AdapterChange(self, event):
         event.Skip()
@@ -2597,7 +3466,9 @@ class MainApp(main.main):
 
             elif self.cInterface.Selection == 1:
                 p = libfindit.find_jtag_idcode(
-                    f"ftdi://{self.tUSBID1.Value}/{self.cChannel.Selection+1}", mpsse=self.bUseMPSSE.Value)
+                    f"ftdi://{self.tUSBID1.Value}/{self.cChannel.Selection+1}",
+                    mpsse=self.bUseMPSSE.Value,
+                )
 
             elif self.cInterface.Selection == len(const._interfaces) - 1:
                 p = libfindit.find_jtag_idcode("", True)
@@ -2607,9 +3478,9 @@ class MainApp(main.main):
 
             if len(p) >= 1:
                 self.finderStatus.Value = f"IDCODE: {' '.join(p[0]['idcodes'])}\nTDO: {p[0]['tdo']}\nTCK: {p[0]['tck']}\nTMS: {p[0]['tms']}\n#TRST: {' '.join(str(x) for x in p[0]['possible_ntrst'])}"
-                self._known_tdo = p[0]['tdo']
-                self._known_tck = p[0]['tck']
-                self._known_tms = p[0]['tms']
+                self._known_tdo = p[0]["tdo"]
+                self._known_tck = p[0]["tck"]
+                self._known_tms = p[0]["tms"]
 
             else:
                 self.finderStatus.Value = "No JTAG Found!"
@@ -2629,15 +3500,29 @@ class MainApp(main.main):
         try:
             if self.cInterface.Selection == 0:
                 p = libfindit.find_jtag_bypass(
-                    f"ftdi://{self.tUSBID.Value}/1", known_tdo=self._known_tdo, known_tck=self._known_tck, known_tms=self._known_tms)
+                    f"ftdi://{self.tUSBID.Value}/1",
+                    known_tdo=self._known_tdo,
+                    known_tck=self._known_tck,
+                    known_tms=self._known_tms,
+                )
 
             elif self.cInterface.Selection == 1:
-                p = libfindit.find_jtag_bypass(f"ftdi://{self.tUSBID1.Value}/{self.cChannel.Selection+1}", mpsse=self.bUseMPSSE.Value,
-                                               known_tdo=self._known_tdo, known_tck=self._known_tck, known_tms=self._known_tms)
+                p = libfindit.find_jtag_bypass(
+                    f"ftdi://{self.tUSBID1.Value}/{self.cChannel.Selection+1}",
+                    mpsse=self.bUseMPSSE.Value,
+                    known_tdo=self._known_tdo,
+                    known_tck=self._known_tck,
+                    known_tms=self._known_tms,
+                )
 
             elif self.cInterface.Selection == len(const._interfaces) - 1:
                 p = libfindit.find_jtag_bypass(
-                    "", True, known_tdo=self._known_tdo, known_tck=self._known_tck, known_tms=self._known_tms)
+                    "",
+                    True,
+                    known_tdo=self._known_tdo,
+                    known_tck=self._known_tck,
+                    known_tms=self._known_tms,
+                )
 
             else:
                 return
@@ -2645,10 +3530,10 @@ class MainApp(main.main):
             if len(p) >= 1:
                 self.finderStatus.Value = f"TDI: {p[0]['tdi']}\nTDO: {p[0]['tdo']}\nTCK: {p[0]['tck']}\nTMS: {p[0]['tms']}\n#TRST: {' '.join(str(x) for x in p[0]['possible_ntrst'])}"
 
-                self._known_tdi = p[0]['tdi']
-                self._known_tdo = p[0]['tdo']
-                self._known_tck = p[0]['tck']
-                self._known_tms = p[0]['tms']
+                self._known_tdi = p[0]["tdi"]
+                self._known_tdo = p[0]["tdo"]
+                self._known_tck = p[0]["tck"]
+                self._known_tms = p[0]["tms"]
 
             else:
                 self.finderStatus.Value = "No JTAG Found!"
@@ -2668,11 +3553,15 @@ class MainApp(main.main):
         try:
             if self.cInterface.Selection == 0:
                 p = libfindit.find_jtag_rtck(
-                    f"ftdi://{self.tUSBID.Value}/1", known_tck=self._known_tck)
+                    f"ftdi://{self.tUSBID.Value}/1", known_tck=self._known_tck
+                )
 
             elif self.cInterface.Selection == 1:
                 p = libfindit.find_jtag_rtck(
-                    f"ftdi://{self.tUSBID1.Value}/{self.cChannel.Selection+1}", mpsse=self.bUseMPSSE.Value, known_tck=self._known_tck)
+                    f"ftdi://{self.tUSBID1.Value}/{self.cChannel.Selection+1}",
+                    mpsse=self.bUseMPSSE.Value,
+                    known_tck=self._known_tck,
+                )
 
             elif self.cInterface.Selection == len(const._interfaces) - 1:
                 p = libfindit.find_jtag_rtck(
@@ -2695,7 +3584,12 @@ class MainApp(main.main):
                           wx.CENTER | wx.ICON_ERROR, self)
 
     def doQuit(self, event: wx.CloseEvent):
-        if wx.MessageBox("Exit Dumpit?", "Dumpit", wx.YES_NO | wx.CENTER | wx.ICON_QUESTION, self) == wx.YES:
+        if (
+            wx.MessageBox(
+                "Exit Dumpit?", "Dumpit", wx.YES_NO | wx.CENTER | wx.ICON_QUESTION, self
+            )
+            == wx.YES
+        ):
             if self._isConnect:
                 self._isConnect = False
                 self._ocd.terminate()
@@ -2802,10 +3696,18 @@ class MainApp(main.main):
             cfg["disable_platform_options"] = self.disable_platform_options
             cfg["identical_check_mode"] = self.identical_check_mode
 
+            cfg["metadata"] = self.metadata
+
             cfg["last_updated"] = int(datetime.datetime.today().timestamp())
 
-            json.dump(cfg, open(os.path.join(os.path.dirname(
-                __file__), "dumpit_config.json"), "w"), indent=4)
+            json.dump(
+                cfg,
+                open(
+                    os.path.join(os.path.dirname(__file__),
+                                 "dumpit_config.json"), "w"
+                ),
+                indent=4,
+            )
 
             wx.Exit()
 
@@ -2851,13 +3753,17 @@ class MainApp(main.main):
 
     def doConfigureRead(self, event):
         TargetReadConfig(self).ShowModal()
+        
+    def doEditMetadata(self, event):
+        UserMetadataConfig(self).ShowModal()
 
     def doProcessSpeedEntry(self, event: wx.CommandEvent):
         self._ocdSendCommand(f"adapter speed {self.nSpeed.Value}")
 
     def doProcessResetMode(self, event: wx.CommandEvent):
         self._ocdSendCommand(
-            f"reset_config {const._reset_type[self.cResetMode.Selection][1]}")
+            f"reset_config {const._reset_type[self.cResetMode.Selection][1]}"
+        )
 
     def doProcessCmdArrow(self, event: wx.KeyEvent):
         if event.KeyCode == wx.WXK_UP:
@@ -2887,8 +3793,34 @@ class MainApp(main.main):
 
 
 def getInitCmd(self: MainApp):
-    cInit = const._interfaces[self.cInterface.Selection][1].replace('(FT232R_VID)', self.tUSBID.Value.split(':')[0]).replace('(FT232R_PID)', self.tUSBID.Value.split(':')[1]).replace('(FT232R_RESTORE_SERIAL)', self.tRestoreSerial.Value).replace('(FT232H_VID)', self.tUSBID1.Value.split(':')[0]).replace('(FT232H_PID)', self.tUSBID1.Value.split(':')[1]).replace('(FT232H_CHANNEL)', str(self.cChannel.Selection)).replace('(FT232H_EDGE)', ['rising', 'falling'][self.rSamplingEdge.Selection]).replace('(FT232H_PINS)', hex(self._ft232h_pins)).replace('(FT232H_DIR)', hex(self._ft232h_dirs)).replace(
-        '(FT232H_LAYOUT_SIGNAL)', f'ftdi layout_signal nTRST -data {hex(1 << self._ft232h_trst)} -oe {hex(1 << self._ft232h_trst)}; ftdi layout_signal nSRST -data {hex(1 << self._ft232h_srst)} -oe {hex(1 << self._ft232h_srst)}; ftdi layout_signal TDI -data {hex(1 << self._ft232h_tdi)}; ftdi layout_signal TDO -data {hex(1 << self._ft232h_tdo)} -oe {hex(1 << self._ft232h_tdo)}; ftdi layout_signal TCK -data {hex(1 << self._ft232h_tck)}; ftdi layout_signal TMS -data {hex(1 << self._ft232h_tms)}').replace("(FT232R_PINS)", "").replace("(GPIOD_CHIP)", str(self.nGPIODChip.Value)).replace('(GPIOD_TDI_PIN)', str(self._gpio_tdi)).replace('(GPIOD_TDO_PIN)', str(self._gpio_tdo)).replace('(GPIOD_TCK_PIN)', str(self._gpio_tck)).replace('(GPIOD_TMS_PIN)', str(self._gpio_tms)).replace('(GPIOD_TRST_PIN)', str(self._gpio_trst)).replace('(GPIOD_SRST_PIN)', str(self._gpio_srst)).replace('(PARPORT_CABLE)', ["dlc5", "wiggler"][self.cParCable.Selection]).replace('(PARPORT_PORT)', self.tParPort.Value).replace('(REMOTE_BITBANG_HOST)', self.tRBBHost.Value).replace('(REMOTE_BITBANG_PORT)', self.tRBBPort.Value)
+    cInit = (
+        const._interfaces[self.cInterface.Selection][1]
+        .replace("(FT232R_VID)", self.tUSBID.Value.split(":")[0])
+        .replace("(FT232R_PID)", self.tUSBID.Value.split(":")[1])
+        .replace("(FT232R_RESTORE_SERIAL)", self.tRestoreSerial.Value)
+        .replace("(FT232H_VID)", self.tUSBID1.Value.split(":")[0])
+        .replace("(FT232H_PID)", self.tUSBID1.Value.split(":")[1])
+        .replace("(FT232H_CHANNEL)", str(self.cChannel.Selection))
+        .replace("(FT232H_EDGE)", ["rising", "falling"][self.rSamplingEdge.Selection])
+        .replace("(FT232H_PINS)", hex(self._ft232h_pins))
+        .replace("(FT232H_DIR)", hex(self._ft232h_dirs))
+        .replace(
+            "(FT232H_LAYOUT_SIGNAL)",
+            f"ftdi layout_signal nTRST -data {hex(1 << self._ft232h_trst)} -oe {hex(1 << self._ft232h_trst)}; ftdi layout_signal nSRST -data {hex(1 << self._ft232h_srst)} -oe {hex(1 << self._ft232h_srst)}; ftdi layout_signal TDI -data {hex(1 << self._ft232h_tdi)}; ftdi layout_signal TDO -data {hex(1 << self._ft232h_tdo)} -oe {hex(1 << self._ft232h_tdo)}; ftdi layout_signal TCK -data {hex(1 << self._ft232h_tck)}; ftdi layout_signal TMS -data {hex(1 << self._ft232h_tms)}",
+        )
+        .replace("(FT232R_PINS)", "")
+        .replace("(GPIOD_CHIP)", str(self.nGPIODChip.Value))
+        .replace("(GPIOD_TDI_PIN)", str(self._gpio_tdi))
+        .replace("(GPIOD_TDO_PIN)", str(self._gpio_tdo))
+        .replace("(GPIOD_TCK_PIN)", str(self._gpio_tck))
+        .replace("(GPIOD_TMS_PIN)", str(self._gpio_tms))
+        .replace("(GPIOD_TRST_PIN)", str(self._gpio_trst))
+        .replace("(GPIOD_SRST_PIN)", str(self._gpio_srst))
+        .replace("(PARPORT_CABLE)", ["dlc5", "wiggler"][self.cParCable.Selection])
+        .replace("(PARPORT_PORT)", self.tParPort.Value)
+        .replace("(REMOTE_BITBANG_HOST)", self.tRBBHost.Value)
+        .replace("(REMOTE_BITBANG_PORT)", self.tRBBPort.Value)
+    )
 
     if self.cInterface.Selection == 1:
         if const._ft232h_adapters[self.cFTAdapter.Selection][1] != "":
@@ -2921,7 +3853,7 @@ def getInitCmd(self: MainApp):
             if const._targets[t] in const._force_ir[v]:
                 fixedIR = v
 
-        additinalCFG = ""
+        additionalCFG = ""
         if not self.disable_platform_options:
             for v in const._additional_config:
                 if const._targets[t] in const._additional_config[v]:
@@ -2929,20 +3861,35 @@ def getInitCmd(self: MainApp):
                     break
 
         if const._targets[t] in const._dap_required:
-            INIT_CMD += const._init_dap.replace("(IR)", str(fixedIR) if fixedIR != 0 else str(self.nIR.Value)).replace(
-                "(XPARAM)", "").replace("(TYPE)", const._targets[t]).replace("(ENDIAN)", "big" if isBig else "little")
+            INIT_CMD += (
+                const._init_dap.replace(
+                    "(IR)", str(fixedIR) if fixedIR != 0 else str(self.nIR.Value)
+                )
+                .replace("(XPARAM)", "")
+                .replace("(TYPE)", const._targets[t])
+                .replace("(ENDIAN)", "big" if isBig else "little")
+            )
 
         else:
-            INIT_CMD += const._init_normal.replace("(IR)", str(fixedIR) if fixedIR != 0 else str(self.nIR.Value)).replace(
-                "(XPARAM)", "").replace("(TYPE)", const._targets[t]).replace("(ENDIAN)", "big" if isBig else "little")
+            INIT_CMD += (
+                const._init_normal.replace(
+                    "(IR)", str(fixedIR) if fixedIR != 0 else str(self.nIR.Value)
+                )
+                .replace("(XPARAM)", "")
+                .replace("(TYPE)", const._targets[t])
+                .replace("(ENDIAN)", "big" if isBig else "little")
+            )
 
         self._cfi_start_offset = 0
 
         if self._loaded_dcc is not None:
-            path_escaped = self._loaded_dcc.replace('\\', '/')
-            INIT_CMD += "flash bank target.dcc ocl 0 0 0 0 target.cpu; set _DCC_PATH {" + path_escaped + \
-                "}; " + \
-                f"set _DCC_START_OFFSET {hex(intelhex.IntelHex(self._loaded_dcc).minaddr())}; "
+            path_escaped = self._loaded_dcc.replace("\\", "/")
+            INIT_CMD += (
+                "flash bank target.dcc ocl 0 0 0 0 target.cpu; set _DCC_PATH {"
+                + path_escaped
+                + "}; "
+                + f"set _DCC_START_OFFSET {hex(intelhex.IntelHex(self._loaded_dcc).minaddr())}; "
+            )
             INIT_CMD += 'proc test_flash {} { flash probe 0; for {set i 0} {$i < 0x04000000} {incr i 0x10000} { set v [flash read_bank_memory 0 $i 0x10000]; echo "Flash read on: 0x[format %X $i]"; }; echo "read is all done"; }; '
 
         elif const._platforms[self.cChipset.Selection]["mode"] == -1:
@@ -2977,8 +3924,9 @@ def getInitCmd(self: MainApp):
 
 
 if __name__ == "__main__":
-    requests.packages.urllib3.util.connection.HAS_IPV6 = os.environ.get(
-        "DUMPIT_IPV4_ONLY", "0") == "1"
+    requests.packages.urllib3.util.connection.HAS_IPV6 = (
+        os.environ.get("DUMPIT_IPV4_ONLY", "0") == "1"
+    )
 
     try:
         app = wx.App(True)

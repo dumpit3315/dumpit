@@ -180,13 +180,13 @@ class main ( wx.Frame ):
 		bSizer611112.Add( self.bConnect, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 		self.bConnectRemote = wx.Button( self.dPage1, wx.ID_ANY, u"Connect to Remote", wx.DefaultPosition, wx.DefaultSize, 0 )
-		bSizer611112.Add( self.bConnectRemote, 0, wx.ALL, 5 )
+		bSizer611112.Add( self.bConnectRemote, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 		self.bForwardRemote = wx.Button( self.dPage1, wx.ID_ANY, u"Forward to Remote", wx.DefaultPosition, wx.DefaultSize, 0 )
-		bSizer611112.Add( self.bForwardRemote, 0, wx.ALL, 5 )
+		bSizer611112.Add( self.bForwardRemote, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 		self.bReconnectRemote = wx.Button( self.dPage1, wx.ID_ANY, u"Reconnect to Remote", wx.DefaultPosition, wx.DefaultSize, 0 )
-		bSizer611112.Add( self.bReconnectRemote, 0, wx.ALL, 5 )
+		bSizer611112.Add( self.bReconnectRemote, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 
 		bSizer5.Add( bSizer611112, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
@@ -224,6 +224,9 @@ class main ( wx.Frame ):
 
 		self.bNandConfigure = wx.Button( self.dPage1, wx.ID_ANY, u"Configure NAND Controller", wx.DefaultPosition, wx.DefaultSize, 0 )
 		bSizer61111.Add( self.bNandConfigure, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+		self.bEditMetadata = wx.Button( self.dPage1, wx.ID_ANY, u"Edit Metadata", wx.DefaultPosition, wx.DefaultSize, 0 )
+		bSizer61111.Add( self.bEditMetadata, 0, wx.ALL, 5 )
 
 
 		bSizer5.Add( bSizer61111, 0, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL, 5 )
@@ -635,6 +638,7 @@ class main ( wx.Frame ):
 		self.bDumpMemory.Bind( wx.EVT_BUTTON, self.doReadMemory )
 		self.bStop.Bind( wx.EVT_BUTTON, self.doStop )
 		self.bNandConfigure.Bind( wx.EVT_BUTTON, self.doNANDConfigure )
+		self.bEditMetadata.Bind( wx.EVT_BUTTON, self.doEditMetadata )
 		self.bGo.Bind( wx.EVT_BUTTON, self.doGo )
 		self.bHalt.Bind( wx.EVT_BUTTON, self.doHalt )
 		self.bReset.Bind( wx.EVT_BUTTON, self.doReset )
@@ -707,6 +711,9 @@ class main ( wx.Frame ):
 		event.Skip()
 
 	def doNANDConfigure( self, event ):
+		event.Skip()
+
+	def doEditMetadata( self, event ):
 		event.Skip()
 
 	def doGo( self, event ):

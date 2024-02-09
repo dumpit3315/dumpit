@@ -10,7 +10,7 @@ class NANDException(Exception):
 
 
 class GenericNANDController():
-    def __init__(self, cmd_write_func, data_read_func, data_write_func, endian, int_read=None, cle: int = 0, ale: int = 0, data: int = 0, nand_int: int = -1, nand_int_mask: int = -1, page_size: int = 0, page_width: int = 0):
+    def __init__(self, cmd_write_func, data_read_func, data_write_func, endian, int_read=None, cle: int = 0, ale: int = 0, data: int = 0, nand_int: int = -1, nand_int_mask: int = -1, page_size: int = 0, page_width: int = 0, inverted_wait_mask: bool = False):
         self._cmd_write = cmd_write_func
         self._data_read = data_read_func
         self._data_write = data_write_func
@@ -26,6 +26,8 @@ class GenericNANDController():
 
         self._nand_int = nand_int
         self._nand_int_mask = nand_int_mask
+        
+        self._wait_invert = inverted_wait_mask
 
         self._idcode = 0
         self.ecc_enabled = True
@@ -38,7 +40,7 @@ class GenericNANDController():
 
         for _ in range(4):
             self._idcode <<= 8
-            self._idcode |= self._data_read(self._nfi_ale)
+            self._idcode |= self._data_read(self._nfi_data)
 
         self._cmd_write(self._nfi_cle, 0xff)
 
@@ -57,7 +59,7 @@ class GenericNANDController():
                 self._cmd_write(self._nfi_ale, (page >> 16) & 0xff)
 
                 if self._int_read and self._nand_int != -1:
-                    while (self._int_read(self._nand_int) & self._nand_int_mask) != 0:
+                    while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
                         time.sleep(0.05)
 
                 else:
@@ -75,7 +77,7 @@ class GenericNANDController():
                 self._cmd_write(self._nfi_ale, (page >> 16) & 0xff)
 
                 if self._int_read and self._nand_int != -1:
-                    while (self._int_read(self._nand_int) & self._nand_int_mask) != 0:
+                    while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
                         time.sleep(0.05)
 
                 else:
@@ -93,7 +95,7 @@ class GenericNANDController():
                 self._cmd_write(self._nfi_ale, (page >> 16) & 0xff)
 
                 if self._int_read and self._nand_int != -1:
-                    while (self._int_read(self._nand_int) & self._nand_int_mask) != 0:
+                    while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
                         time.sleep(0.05)
 
                 else:
@@ -112,7 +114,7 @@ class GenericNANDController():
                 self._cmd_write(self._nfi_ale, (page >> 16) & 0xff)
 
                 if self._int_read and self._nand_int != -1:
-                    while (self._int_read(self._nand_int) & self._nand_int_mask) != 0:
+                    while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
                         time.sleep(0.05)
 
                 else:
@@ -131,7 +133,7 @@ class GenericNANDController():
                 self._cmd_write(self._nfi_ale, (page >> 16) & 0xff)
 
                 if self._int_read and self._nand_int != -1:
-                    while (self._int_read(self._nand_int) & self._nand_int_mask) != 0:
+                    while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
                         time.sleep(0.05)
 
                 else:
@@ -153,7 +155,178 @@ class GenericNANDController():
             self._cmd_write(self._nfi_cle, 0x30)
 
             if self._int_read and self._nand_int != -1:
-                while (self._int_read(self._nand_int) & self._nand_int_mask) != 0:
+                while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
+                    time.sleep(0.05)
+
+            else:
+                time.sleep(0.1)
+
+            if self._page_width == 0:
+                for _ in range(0x800):
+                    tempData.append(self._data_read(self._nfi_data))
+
+                for _ in range(0x40):
+                    tempSpare.append(self._data_read(self._nfi_data))
+
+            else:
+                for _ in range(0x400):
+                    tempData += self._data_read(
+                        self._nfi_data).to_bytes(2, self._endian)
+
+                for _ in range(0x20):
+                    tempSpare += self._data_read(
+                        self._nfi_data).to_bytes(2, self._endian)
+
+        return bytes(tempData), bytes(tempSpare), b""
+
+    def write(self, page: int, data: typing.Union[bytes, bytearray]):
+        raise NotImplementedError()
+
+    def erase(self, page: int):
+        raise NotImplementedError()
+
+
+class GenericNANDControllerGPIO():
+    def __init__(self, gpio_read_func, gpio_write_func, data_read_func, data_write_func, endian, latch_addr, data, cle_mask: int = 1, ale_mask: int = 2, busy_addr: int = -1, read_busy_mask: int = 0, page_size: int = 0, page_width: int = 0, inverted_wait_mask: bool = False):
+        self._gpio_read = gpio_read_func
+        self._gpio_write = gpio_write_func
+        self._data_read = data_read_func
+        self._data_write = data_write_func
+        self._endian = endian
+
+        self._nfi_cle_mask = cle_mask
+        self._nfi_ale_mask = ale_mask
+        self._nfi_rb_mask = read_busy_mask
+        self._nfi_latch = latch_addr
+        self._nfi_busy = busy_addr
+        self._nfi_data = data
+
+        self._page_size = page_size
+        self._page_width = page_width
+        
+        self._wait_invert = inverted_wait_mask
+
+        self._idcode = 0
+        self.ecc_enabled = True
+
+        self._gpio_write(self._nfi_latch, self._gpio_read(
+            self._nfi_latch) & ~(self._nfi_cle_mask | self._nfi_ale_mask))
+
+        self._send_cmd(0xff)
+        self._send_cmd(0x90, [0x00])
+
+        self._idcode = 0
+
+        for _ in range(4):
+            self._idcode <<= 8
+            self._idcode |= self._data_read(self._nfi_data)
+
+        self._send_cmd(0xff)
+
+    def _send_cmd(self, cmd: int, addr: typing.List[int] = None):
+        self._gpio_write(self._nfi_latch, self._gpio_read(
+            self._nfi_latch) | self._nfi_cle_mask)
+        self._data_write(self._nfi_data, cmd)
+
+        self._gpio_write(self._nfi_latch, self._gpio_read(
+            self._nfi_latch) & ~self._nfi_cle_mask)
+
+        if addr is not None:
+            self._gpio_write(self._nfi_latch, self._gpio_read(
+                self._nfi_latch) | self._nfi_ale_mask)
+
+            for a in addr:
+                self._data_write(self._nfi_data, a)
+
+            self._gpio_write(self._nfi_latch, self._gpio_read(
+                self._nfi_latch) & ~self._nfi_ale_mask)
+
+    def read(self, page: int):
+        tempData = bytearray()
+        tempSpare = bytearray()
+
+        if self._page_size == 0:
+            if self._page_width == 0:
+                ''' First read '''
+                self._send_cmd(
+                    0x00, [0x00, (page & 0xff), ((page >> 8) & 0xff), ((page >> 16) & 0xff)])
+
+                if self._nfi_busy != -1 and self._nfi_rb_mask:
+                    while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
+                        time.sleep(0.05)
+
+                else:
+                    time.sleep(0.1)
+
+                for _ in range(0x100):
+                    tempData.append(self._data_read(self._nfi_data))
+
+                ''' Second read '''
+                self._send_cmd(
+                    0x01, [0x00, (page & 0xff), ((page >> 8) & 0xff), ((page >> 16) & 0xff)])
+
+                if self._nfi_busy != -1 and self._nfi_rb_mask != -1:
+                    while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
+                        time.sleep(0.05)
+
+                else:
+                    time.sleep(0.1)
+
+                for _ in range(0x100):
+                    tempData.append(self._data_read(self._nfi_data))
+
+                ''' Spare read '''
+                self._send_cmd(
+                    0x50, [0x00, (page & 0xff), ((page >> 8) & 0xff), ((page >> 16) & 0xff)])
+
+                if self._nfi_busy != -1 and self._nfi_rb_mask != -1:
+                    while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
+                        time.sleep(0.05)
+
+                else:
+                    time.sleep(0.1)
+
+                for _ in range(0x10):
+                    tempSpare.append(self._data_read(self._nfi_data))
+
+            else:
+                ''' First read '''
+                self._send_cmd(
+                    0x00, [0x00, (page & 0xff), ((page >> 8) & 0xff), ((page >> 16) & 0xff)])
+
+                if self._nfi_busy != -1 and self._nfi_rb_mask != -1:
+                    while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
+                        time.sleep(0.05)
+
+                else:
+                    time.sleep(0.1)
+
+                for _ in range(0x100):
+                    tempData += self._data_read(
+                        self._nfi_data).to_bytes(2, self._endian)
+
+                ''' Spare read '''
+                self._send_cmd(
+                    0x50, [0x00, (page & 0xff), ((page >> 8) & 0xff), ((page >> 16) & 0xff)])
+
+                if self._nfi_busy != -1 and self._nfi_rb_mask != -1:
+                    while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
+                        time.sleep(0.05)
+
+                else:
+                    time.sleep(0.1)
+
+                for _ in range(0x8):
+                    tempSpare += self._data_read(
+                        self._nfi_data).to_bytes(2, self._endian)
+
+        else:
+            self._send_cmd(0x00, [0x00, 0x00, (page & 0xff),
+                           ((page >> 8) & 0xff), ((page >> 16) & 0xff)])
+            self._send_cmd(0x30)
+
+            if self._nfi_busy != -1 and self._nfi_rb_mask != -1:
+                while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
                     time.sleep(0.05)
 
             else:

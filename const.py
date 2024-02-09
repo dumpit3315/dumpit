@@ -1,4 +1,4 @@
-DUMPIT_VERSION = "0.91"
+DUMPIT_VERSION = "0.92"
 
 _interfaces = [
     (
@@ -280,7 +280,7 @@ _platforms_a = [
         "flash_cmd": 0xC1300004,
         "flash_addr": 0xC1300008,
         "flash_wait": 0xC1300018,
-        "reg_width": 4,
+        "reg_width": 5,
         "wait_mask": 0x1,
         "init": [
             {"address": "C1300004", "type": 4, "value": "0xFF", "delay_after": 600},
@@ -306,6 +306,19 @@ _platforms_a = [
         "flash_wait": 0x9F8000C8,
         "reg_width": 0,
         "wait_mask": 2,
+        "init": [],
+    },
+    {
+        "name": "MSM5100 (NAND, CDM-9500)",
+        "mode": 9,
+        "flash_buffer": 0x800000,
+        "flash_latch": 0x03000724,        
+        "flash_wait": 0x03000720,
+        "reg_width": 2,
+        "gpio_width": 4,
+        "wait_mask": 0x40,
+        "ale_mask": 0x1000,
+        "cle_mask": 0x2000,
         "init": [],
     },
     {"name": "OneNAND (Generic)", "mode": 7, "init": []},
