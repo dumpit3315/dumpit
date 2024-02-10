@@ -239,10 +239,10 @@ class MSM6250NANDController(_BaseQCOMNANDController):
         if self._msm6500_discrepancy:
             if self._page_width == 1:
                 return self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 2, 0x200), self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 0x202, 0xe) + b"\xff\xff", self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value, 0x2)
-            
+
             else:
                 return self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 1, 0x200), self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 0x201, 0xf) + b"\xff", self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value, 0x1)
-            
+
         else:
             return self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value, 0x200), self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 0x200, 0x10), b""
 
@@ -392,12 +392,12 @@ class MSM6800NANDController(_BaseQCOMNANDController):
         self._set_common_cfg = custom_common_cfg if custom_common_cfg != -1 else 0x3
         self._set_cfg2 = custom_cfg2 if custom_cfg2 != -1 else 0x4219442
         self._set_cfg1 = custom_cfg1 if custom_cfg1 != -1 else (0xa | (self._page_size << MSM6800_NANDCFG1_BITS_MASK.PAGE_IS_2KB.value[0]) | (
-        self._page_width << MSM6800_NANDCFG1_BITS_MASK.WIDE_NAND.value[0]) | (get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_DONE) << 31))
+            self._page_width << MSM6800_NANDCFG1_BITS_MASK.WIDE_NAND.value[0]) | (get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_DONE) << 31))
 
         if self._skip_reg_init:
             self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_COMMON_CFG.value,
                             self._prev_common_cfg)
-            
+
         self._reset_first = False
 
     def read(self, page: int):
@@ -659,7 +659,7 @@ class MSM7200NANDController(_BaseQCOMNANDController):
 
         if not self._reset_first:
             self._reset_first = True
-            
+
             if not self._skip_reg_init:
                 self._send_cmd(MSM7200_NANDOPS.RESET.value)
             self._send_cmd(MSM7200_NANDOPS.RESET_NAND.value)
