@@ -53,7 +53,7 @@ _force_ir = {
     5: ["arm11"],
 }
 _additional_config = {
-    "arm7_9 dcc_downloads enable; arm7_9 fast_memory_access enable; arm7_9 additional_nop enable": [
+    "arm7_9 dcc_downloads enable; arm7_9 fast_memory_access enable; arm7_9 additional_nop enable; arm7_9 dbgrq enable": [
         "arm7tdmi",
         "arm9tdmi",
         "arm920t",
@@ -64,7 +64,7 @@ _additional_config = {
     ],
 }
 _additional_config_unset = {
-    "arm7_9 dcc_downloads disable; arm7_9 fast_memory_access disable; arm7_9 additional_nop disable": [
+    "arm7_9 dcc_downloads disable; arm7_9 fast_memory_access disable; arm7_9 additional_nop disable; arm7_9 dbgrq disable": [
         "arm7tdmi",
         "arm9tdmi",
         "arm920t",
