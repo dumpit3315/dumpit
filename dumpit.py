@@ -1280,7 +1280,7 @@ class MainApp(main.main):
     def _doLogging(self):
         for l in _unbuffered(self._ocd, "stderr"):
             try:
-                if not self._logSupressed or l.startswith(b"Error:"):
+                if not self._logSupressed or l.startswith(b"Error:") or l.startswith(b"Warn :"):
                     self._logThreadQueue.put(l.decode("utf-8"))
                     if self._isForward:
                         log_randid = random.randbytes(16).hex()
@@ -1356,7 +1356,7 @@ class MainApp(main.main):
                             self.idcode = p[1]["d"]
 
                     elif p[0] == "log" and (
-                        not self._logSupressed or p[1].startswith(b"Error:") or p[1].startswith(b"Warn:")
+                        not self._logSupressed or p[1].startswith(b"Error:") or p[1].startswith(b"Warn :")
                     ):
                         self._logThreadQueue.put(p[1])
 
