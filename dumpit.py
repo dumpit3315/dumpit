@@ -117,6 +117,17 @@ def getOCDExec():
             os.path.dirname(__file__),
             f"ocd/{sys.platform}-{get_arch_platform()}/bin/openocd",
         )
+    
+    elif os.path.exists(
+        os.path.join(
+            os.path.dirname(__file__),
+            f"ocd/{sys.platform}-{get_arch_platform()}/bin/openocd.exe",
+        )
+    ):
+        return os.path.join(
+            os.path.dirname(__file__),
+            f"ocd/{sys.platform}-{get_arch_platform()}/bin/openocd.exe",
+        )    
 
     return os.path.join(f"ocd/{sys.platform}-{get_arch_platform()}/bin/openocd")
 
@@ -1345,7 +1356,7 @@ class MainApp(main.main):
                             self.idcode = p[1]["d"]
 
                     elif p[0] == "log" and (
-                        not self._logSupressed or p[1].startswith(b"Error:")
+                        not self._logSupressed or p[1].startswith(b"Error:") or p[1].startswith(b"Warn:")
                     ):
                         self._logThreadQueue.put(p[1])
 
