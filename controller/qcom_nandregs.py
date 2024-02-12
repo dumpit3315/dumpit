@@ -614,8 +614,13 @@ class MSM7200NANDController(_BaseQCOMNANDController):
 
         self._send_cmd(MSM7200_NANDOPS.FETCH_ID.value)
         self._page_width = 0
-        self._idcode = ((self._cmd_read(self._nfi_base + MSM7200_NANDREGS.READ_ID.value) & 0xff) << 24) | (((self._cmd_read(self._nfi_base + MSM7200_NANDREGS.READ_ID.value) >> 8) & 0xff)
-                                                                                                           << 16) | (((self._cmd_read(self._nfi_base + MSM7200_NANDREGS.READ_ID.value) >> 16) & 0xff) << 8) | ((self._cmd_read(self._nfi_base + MSM7200_NANDREGS.READ_ID.value) >> 24) & 0xff)
+        tempIDCode = self._cmd_read(self._nfi_base + MSM7200_NANDREGS.READ_ID.value)
+
+        self._idcode = 0
+        for i in range(4):
+            self._idcode <<= 8
+            self._idcode |= ((tempIDCode >> (i * 8)) & 0xff)
+
         self._isFirst = False
         self._reset_first = False
 
