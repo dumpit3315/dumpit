@@ -2797,11 +2797,9 @@ class MainApp(main.main):
                         ),
                     )
 
-                    assert NANDC._idcode not in [
-                        0x0,
-                        0xFFFFFFFF,
-                        0xFFFF0000,
-                        0xFFFF00FF,
+                    assert ((NANDC._idcode >> 24) & 0xff) not in [
+                        0xEC,
+                        0x20,
                     ], "NAND detect failed"
 
                     MFR_ID_HEX = f"0x{((NANDC._idcode >> 24) & 0xff):02x}"
