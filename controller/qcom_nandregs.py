@@ -228,13 +228,13 @@ class MSM6250NANDController(_BaseQCOMNANDController):
         if self._nand_int_clr_addr != -1 and self._nand_int_addr != -1:
             self._cmd_write(self._nand_int_clr_addr, self._nand_reset_op)
             while (self._cmd_read(self._nand_int_addr) & self._nand_reset_op) != 0:
-                time.sleep(0.05)
+                pass
 
         self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CMD.value,
                         MSM6250_6800_NANDOPS.PAGE_READ.value)
 
         while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS.value, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
-            time.sleep(0.05)
+            pass
 
         if self._msm6500_discrepancy:
             if self._page_width == 1:
@@ -439,7 +439,7 @@ class MSM6800NANDController(_BaseQCOMNANDController):
 
         self._cmd_write(self._nand_int_clr_addr, self._nand_reset_op)
         while (self._cmd_read(self._nand_int_addr) & self._nand_reset_op) != 0:
-            time.sleep(0.05)
+            pass
 
         tempbuf = bytearray()
         tempbuf_spare = bytearray()
@@ -449,7 +449,7 @@ class MSM6800NANDController(_BaseQCOMNANDController):
                             MSM6250_6800_NANDOPS.PAGE_READ.value)
 
             while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
-                time.sleep(0.05)
+                pass
 
             tempbuf += self._mem_read(self._nfi_base +
                                       MSM6800_NANDREGS.FLASH_BUFFER.value, 0x200)
@@ -698,7 +698,7 @@ class MSM7200NANDController(_BaseQCOMNANDController):
             self._cmd_write(self._nfi_base +
                             MSM7200_NANDREGS.EXEC_CMD.value, 1)
             while get_bit(self, self._nfi_base + MSM7200_NANDREGS.FLASH_STATUS.value, MSM7200_NAND_FLASH_STATUS_BITS_MASK.OPER_STATUS) != 0:
-                time.sleep(0.05)
+                pass
 
             temp_mem = self._mem_read(self._nfi_base +
                                       MSM7200_NANDREGS.FLASH_BUFFER.value, 0x210)

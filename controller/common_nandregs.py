@@ -60,7 +60,7 @@ class GenericNANDController():
 
                 if self._int_read and self._nand_int != -1:
                     while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
-                        time.sleep(0.05)
+                        pass
 
                 else:
                     time.sleep(0.1)
@@ -78,7 +78,7 @@ class GenericNANDController():
 
                 if self._int_read and self._nand_int != -1:
                     while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
-                        time.sleep(0.05)
+                        pass
 
                 else:
                     time.sleep(0.1)
@@ -96,7 +96,7 @@ class GenericNANDController():
 
                 if self._int_read and self._nand_int != -1:
                     while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
-                        time.sleep(0.05)
+                        pass
 
                 else:
                     time.sleep(0.1)
@@ -115,7 +115,7 @@ class GenericNANDController():
 
                 if self._int_read and self._nand_int != -1:
                     while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
-                        time.sleep(0.05)
+                        pass
 
                 else:
                     time.sleep(0.1)
@@ -134,7 +134,7 @@ class GenericNANDController():
 
                 if self._int_read and self._nand_int != -1:
                     while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
-                        time.sleep(0.05)
+                        pass
 
                 else:
                     time.sleep(0.1)
@@ -156,7 +156,7 @@ class GenericNANDController():
 
             if self._int_read and self._nand_int != -1:
                 while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
-                    time.sleep(0.05)
+                    pass
 
             else:
                 time.sleep(0.1)
@@ -253,7 +253,7 @@ class GenericNANDControllerGPIO():
 
                 if self._nfi_busy != -1 and self._nfi_rb_mask:
                     while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
-                        time.sleep(0.05)
+                        pass
 
                 else:
                     time.sleep(0.1)
@@ -267,7 +267,7 @@ class GenericNANDControllerGPIO():
 
                 if self._nfi_busy != -1 and self._nfi_rb_mask != -1:
                     while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
-                        time.sleep(0.05)
+                        pass
 
                 else:
                     time.sleep(0.1)
@@ -281,7 +281,7 @@ class GenericNANDControllerGPIO():
 
                 if self._nfi_busy != -1 and self._nfi_rb_mask != -1:
                     while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
-                        time.sleep(0.05)
+                        pass
 
                 else:
                     time.sleep(0.1)
@@ -296,7 +296,7 @@ class GenericNANDControllerGPIO():
 
                 if self._nfi_busy != -1 and self._nfi_rb_mask != -1:
                     while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
-                        time.sleep(0.05)
+                        pass
 
                 else:
                     time.sleep(0.1)
@@ -311,7 +311,7 @@ class GenericNANDControllerGPIO():
 
                 if self._nfi_busy != -1 and self._nfi_rb_mask != -1:
                     while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
-                        time.sleep(0.05)
+                        pass
 
                 else:
                     time.sleep(0.1)
@@ -327,7 +327,7 @@ class GenericNANDControllerGPIO():
 
             if self._nfi_busy != -1 and self._nfi_rb_mask != -1:
                 while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
-                    time.sleep(0.05)
+                    pass
 
             else:
                 time.sleep(0.1)
@@ -482,7 +482,7 @@ class OneNANDController():
                         O1N_REGS.REG_COMMAND.value, O1N_NANDOPS.READ)
 
         while (self._cmd_read(self._o1n_base + O1N_REGS.REG_INTERRUPT.value) & 0x8080) != 0x8080:
-            time.sleep(0.05)
+            pass
 
         return self._data_read(self._o1n_base + O1N_REGS.DATARAM, 0x800 if self._o1n_size == 0 else 0x1000), self._data_read(self._o1n_base + O1N_REGS.SPARERAM, 0x40 if self._o1n_size == 0 else 0x80), b""
 
