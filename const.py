@@ -675,7 +675,7 @@ _platforms_c = [
     {"name": "OneNAND QSC62x0/QSC60x5", "mode": 7, "o1n_offset": 0x38000000, "init": []},
     {"name": "OneNAND MSM62xx", "mode": 7, "o1n_offset": 0x40000000, "init": []},
     {"name": "OneNAND OMAP850", "mode": 7, "o1n_offset": 0x0, "init": []},
-    {"name": "OneNAND MSM72xx", "mode": 7, "o1n_offset": 0x30000000, "init": []},
+    {"name": "OneNAND MSM72xx", "mode": 7, "o1n_offset": 0x88000000, "init": []},
     {"name": "NULL", "mode": -1, "init": []},
 ]
 
