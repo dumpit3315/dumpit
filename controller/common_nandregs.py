@@ -491,7 +491,7 @@ class OneNANDController():
                         O1N_REGS.REG_COMMAND.value, O1N_NANDOPS.HOT_RESET.value)
 
         while (self._cmd_read(self._o1n_base + O1N_REGS.REG_INTERRUPT.value) & 0x8000) != 0x8000:
-            time.sleep(0.05)
+            pass # time.sleep(0.05)
 
         self._idcode = (self._cmd_read(self._o1n_base + O1N_REGS.REG_MANUFACTURER_ID.value)
                         << 24) | (self._cmd_read(self._o1n_base + O1N_REGS.REG_DEVICE_ID.value) << 16)

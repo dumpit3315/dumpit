@@ -53,7 +53,7 @@ class BCM2133NANDController():
                 time.sleep(0.1)
 
             while (self._cmd_read(0x8090000) & 0x40) == 0:
-                time.sleep(0.1)
+                pass #time.sleep(0.1)
 
             for _ in range(4):
                 self._idcode <<= 8
@@ -76,10 +76,10 @@ class BCM2133NANDController():
                 self._cmd_write(0x2800000, (page << 8) & 0xffffffff)
                 self._cmd_write(0x2b18000, ((page << 8) >> 24) & 0xffffffff)
 
-            for _ in range(0x400):
+            for _ in range(0x800):
                 if (self._mem_read(0x809001c) & 0x2) == 0:
                     break
-                time.sleep(0.01)
+                pass #time.sleep(0.01)
 
             while (self._mem_read(0x809001c) & 0x2) == 0:
                 pass
@@ -102,7 +102,7 @@ class BCM2133NANDController():
                     for _ in range(0x400):
                         if (self._cmd_read(0x8090000) & 0x40) == 0:
                             break
-                        time.sleep(0.01)
+                        pass #time.sleep(0.01)
 
                     while (self._cmd_read(0x8090000) & 0x40) == 0:
                         pass
@@ -120,7 +120,7 @@ class BCM2133NANDController():
                     for _ in range(0x400):
                         if (self._cmd_read(0x8090000) & 0x40) == 0:
                             break
-                        time.sleep(0.01)
+                        pass #time.sleep(0.01)
 
                     while (self._cmd_read(0x8090000) & 0x40) == 0:
                         pass
@@ -138,7 +138,7 @@ class BCM2133NANDController():
                     for _ in range(0x400):
                         if (self._cmd_read(0x8090000) & 0x40) == 0:
                             break
-                        time.sleep(0.01)
+                        pass #time.sleep(0.01)
 
                     while (self._cmd_read(0x8090000) & 0x40) == 0:
                         pass
@@ -157,7 +157,7 @@ class BCM2133NANDController():
                     for _ in range(0x400):
                         if (self._cmd_read(0x8090000) & 0x40) == 0:
                             break
-                        time.sleep(0.01)
+                        pass #time.sleep(0.01)
 
                     while (self._cmd_read(0x8090000) & 0x40) == 0:
                         pass
@@ -175,7 +175,7 @@ class BCM2133NANDController():
                     for _ in range(0x400):
                         if (self._cmd_read(0x8090000) & 0x40) == 0:
                             break
-                        time.sleep(0.01)
+                        pass #time.sleep(0.01)
 
                     while (self._cmd_read(0x8090000) & 0x40) == 0:
                         pass
@@ -196,7 +196,7 @@ class BCM2133NANDController():
                 for _ in range(0x400):
                     if (self._cmd_read(0x8090000) & 0x40) == 0:
                         break
-                    time.sleep(0.01)
+                    pass #time.sleep(0.01)
 
                 while (self._cmd_read(0x8090000) & 0x40) == 0:
                     pass
