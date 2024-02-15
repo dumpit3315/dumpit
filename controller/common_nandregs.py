@@ -10,7 +10,7 @@ class NANDException(Exception):
 
 
 class GenericNANDController():
-    def __init__(self, cmd_write_func, data_read_func, data_write_func, endian, int_read=None, cle: int = 0, ale: int = 0, data: int = 0, nand_int: int = -1, nand_int_mask: int = -1, page_size: int = 0, page_width: int = 0, inverted_wait_mask: bool = False):
+    def __init__(self, cmd_write_func, data_read_func, data_write_func, endian, int_read=None, cle: int = 0, ale: int = 0, data: int = 0, nand_int: typing.Union[int, None] = -1, nand_int_mask: int = -1, page_size: int = 0, page_width: int = 0, inverted_wait_mask: bool = False):
         self._cmd_write = cmd_write_func
         self._data_read = data_read_func
         self._data_write = data_write_func
@@ -58,9 +58,17 @@ class GenericNANDController():
                 self._cmd_write(self._nfi_ale, (page >> 8) & 0xff)
                 self._cmd_write(self._nfi_ale, (page >> 16) & 0xff)
 
-                if self._int_read and self._nand_int != -1:
+                if self._int_read and self._nand_int is not None and self._nand_int_mask != 0:
                     while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
                         pass
+
+                elif self._nand_int_mask != 0:
+                    self._cmd_write(self._nfi_cle, 0x70)
+
+                    while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
+                        pass
+
+                    self._cmd_write(self._nfi_cle, 0x00)
 
                 else:
                     time.sleep(0.1)
@@ -76,9 +84,17 @@ class GenericNANDController():
                 self._cmd_write(self._nfi_ale, (page >> 8) & 0xff)
                 self._cmd_write(self._nfi_ale, (page >> 16) & 0xff)
 
-                if self._int_read and self._nand_int != -1:
+                if self._int_read and self._nand_int is not None and self._nand_int_mask != 0:
                     while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
                         pass
+
+                elif self._nand_int_mask != 0:
+                    self._cmd_write(self._nfi_cle, 0x70)
+
+                    while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
+                        pass
+
+                    self._cmd_write(self._nfi_cle, 0x00)
 
                 else:
                     time.sleep(0.1)
@@ -94,9 +110,17 @@ class GenericNANDController():
                 self._cmd_write(self._nfi_ale, (page >> 8) & 0xff)
                 self._cmd_write(self._nfi_ale, (page >> 16) & 0xff)
 
-                if self._int_read and self._nand_int != -1:
+                if self._int_read and self._nand_int is not None and self._nand_int_mask != 0:
                     while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
                         pass
+
+                elif self._nand_int_mask != 0:
+                    self._cmd_write(self._nfi_cle, 0x70)
+
+                    while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
+                        pass
+
+                    self._cmd_write(self._nfi_cle, 0x00)
 
                 else:
                     time.sleep(0.1)
@@ -113,9 +137,17 @@ class GenericNANDController():
                 self._cmd_write(self._nfi_ale, (page >> 8) & 0xff)
                 self._cmd_write(self._nfi_ale, (page >> 16) & 0xff)
 
-                if self._int_read and self._nand_int != -1:
+                if self._int_read and self._nand_int is not None and self._nand_int_mask != 0:
                     while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
                         pass
+
+                elif self._nand_int_mask != 0:
+                    self._cmd_write(self._nfi_cle, 0x70)
+
+                    while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
+                        pass
+
+                    self._cmd_write(self._nfi_cle, 0x00)
 
                 else:
                     time.sleep(0.1)
@@ -132,9 +164,17 @@ class GenericNANDController():
                 self._cmd_write(self._nfi_ale, (page >> 8) & 0xff)
                 self._cmd_write(self._nfi_ale, (page >> 16) & 0xff)
 
-                if self._int_read and self._nand_int != -1:
+                if self._int_read and self._nand_int is not None and self._nand_int_mask != 0:
                     while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
                         pass
+
+                elif self._nand_int_mask != 0:
+                    self._cmd_write(self._nfi_cle, 0x70)
+
+                    while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
+                        pass
+
+                    self._cmd_write(self._nfi_cle, 0x00)
 
                 else:
                     time.sleep(0.1)
@@ -154,9 +194,17 @@ class GenericNANDController():
 
             self._cmd_write(self._nfi_cle, 0x30)
 
-            if self._int_read and self._nand_int != -1:
+            if self._int_read and self._nand_int is not None and self._nand_int_mask != 0:
                 while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
                     pass
+
+            elif self._nand_int_mask != 0:
+                self._cmd_write(self._nfi_cle, 0x70)
+
+                while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
+                    pass
+
+                self._cmd_write(self._nfi_cle, 0x00)
 
             else:
                 time.sleep(0.1)
@@ -440,7 +488,7 @@ class OneNANDController():
 
         self._cmd_write(self._o1n_base + O1N_REGS.REG_INTERRUPT.value, 0x0)
         self._cmd_write(self._o1n_base +
-                        O1N_REGS.REG_COMMAND.value, O1N_NANDOPS.HOT_RESET)
+                        O1N_REGS.REG_COMMAND.value, O1N_NANDOPS.HOT_RESET.value)
 
         while (self._cmd_read(self._o1n_base + O1N_REGS.REG_INTERRUPT.value) & 0x8000) != 0x8000:
             time.sleep(0.05)
@@ -479,12 +527,12 @@ class OneNANDController():
         self._cmd_write(self._o1n_base +
                         O1N_REGS.REG_START_ADDRESS8.value, (page & 63) << 2)
         self._cmd_write(self._o1n_base +
-                        O1N_REGS.REG_COMMAND.value, O1N_NANDOPS.READ)
+                        O1N_REGS.REG_COMMAND.value, O1N_NANDOPS.READ.value)
 
         while (self._cmd_read(self._o1n_base + O1N_REGS.REG_INTERRUPT.value) & 0x8080) != 0x8080:
             pass
 
-        return self._data_read(self._o1n_base + O1N_REGS.DATARAM, 0x800 if self._o1n_size == 0 else 0x1000), self._data_read(self._o1n_base + O1N_REGS.SPARERAM, 0x40 if self._o1n_size == 0 else 0x80), b""
+        return self._data_read(self._o1n_base + O1N_REGS.DATARAM.value, 0x800 if self._o1n_size == 0 else 0x1000), self._data_read(self._o1n_base + O1N_REGS.SPARERAM.value, 0x40 if self._o1n_size == 0 else 0x80), b""
 
     def write(self, page: int, data: typing.Union[bytes, bytearray]):
         raise NotImplementedError()

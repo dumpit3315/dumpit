@@ -2,6 +2,7 @@ import enum
 import time
 import typing
 from .regs.msm7200 import *
+from .common_nandregs import O1N_REGS, O1N_NANDOPS
 
 _DEBUG_CONTROLLER = False
 
@@ -614,7 +615,8 @@ class MSM7200NANDController(_BaseQCOMNANDController):
 
         self._send_cmd(MSM7200_NANDOPS.FETCH_ID.value)
         self._page_width = 0
-        tempIDCode = self._cmd_read(self._nfi_base + MSM7200_NANDREGS.READ_ID.value)
+        tempIDCode = self._cmd_read(
+            self._nfi_base + MSM7200_NANDREGS.READ_ID.value)
 
         self._idcode = 0
         for i in range(4):
@@ -629,7 +631,7 @@ class MSM7200NANDController(_BaseQCOMNANDController):
                         MSM7200_NANDREGS.FLASH_CMD.value, cmd_no)
         self._cmd_write(self._nfi_base + MSM7200_NANDREGS.EXEC_CMD.value, 1)
         while get_bit(self, self._nfi_base + MSM7200_NANDREGS.FLASH_STATUS.value, MSM7200_NAND_FLASH_STATUS_BITS_MASK.OPER_STATUS) != 0:
-            time.sleep(0.05)
+            pass
 
     def read(self, page: int):
         if not self._isFirst:
@@ -720,6 +722,157 @@ class MSM7200NANDController(_BaseQCOMNANDController):
         return bytes(tempbuf), bytes(tempbuf_spare), bytes(tempbuf_bbm)
 
 
+class MSM7200OneNANDController(_BaseQCOMNANDController):
+    def __init__(self, read32_func, write32_func, read8_func, write8_func, base: int = 0xa0a00000, page_size: int = 0, skip_init: bool = False, custom_cfg1: int = -1, custom_cfg2: int = -1):
+        super().__init__(read32_func, write32_func, read8_func, write8_func, base, page_size)
+
+        self._skip_reg_init = skip_init
+        self._cfg1 = custom_cfg1
+        self._cfg2 = custom_cfg2
+
+        self._prev_cfg1 = self._cmd_read(
+            self._nfi_base + MSM7200_NANDREGS.DEV0_CFG0.value)
+
+        self._prev_cfg2 = self._cmd_read(
+            self._nfi_base + MSM7200_NANDREGS.DEV0_CFG1.value)
+
+        self._d2_prev_cfg1 = self._cmd_read(
+            self._nfi_base + MSM7200_NANDREGS.DEV1_CFG0.value)
+
+        self._d2_prev_cfg2 = self._cmd_read(
+            self._nfi_base + MSM7200_NANDREGS.DEV1_CFG1.value)
+
+        if not self._skip_reg_init:
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.DEV0_CFG0.value, 0xaad4001a)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.DEV0_CFG1.value, 0x2101bd)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.DEV_CMD_VLD.value, 0xd)
+            self._cmd_write(
+                self._nfi_base + MSM7200_NANDREGS.SFLASHC_BURST_CFG.value, 0x20100327)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.XFR_STEP1.value, 0x47804780)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.XFR_STEP2.value, 0x39003a0)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.XFR_STEP3.value, 0x3b008a8)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.XFR_STEP4.value, 0x9b488a0)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.XFR_STEP5.value, 0x89a2c420)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.XFR_STEP6.value, 0xc420c020)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.XFR_STEP7.value, 0xc020c020)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.FLASH_CHIP_SELECT.value, 0x0)
+
+        self._regwrite(O1N_REGS.REG_SYS_CFG1, 0x40c0)
+        self._regwrite(O1N_REGS.REG_START_ADDRESS1, 0x0)
+        self._regwrite(O1N_REGS.REG_START_ADDRESS2, 0x0)
+        self._regwrite(O1N_REGS.REG_INTERRUPT, 0x0)
+
+        self._regwrite(O1N_REGS.REG_COMMAND, O1N_NANDOPS.HOT_RESET.value)
+        while (self._regread(O1N_REGS.REG_INTERRUPT) & 0x8000) != 0x8000:
+            time.sleep(0.1)
+
+        self._idcode = (self._regread(O1N_REGS.REG_MANUFACTURER_ID)
+                        << 24) | (self._regread(O1N_REGS.REG_DEVICE_ID) << 16)
+        self._ddp = bool(self._regread(O1N_REGS.REG_DEVICE_ID) & 8)
+
+        density_raw = (self._regread(O1N_REGS.REG_DEVICE_ID) >> 4) & 0xf
+
+        self._density = 2 << ((5 if self._ddp else 6) + density_raw)
+
+    def _cmdexec(self):
+        while self._cmd_read(self._nfi_base + MSM7200_NANDREGS.SFLASHC_EXEC_CMD.value) & 0x1:
+            pass
+
+        self._cmd_write(self._nfi_base +
+                        MSM7200_NANDREGS.SFLASHC_EXEC_CMD.value, 1)
+
+        while self._cmd_read(self._nfi_base + MSM7200_NANDREGS.SFLASHC_EXEC_CMD.value) & 0x1:
+            pass
+
+    def _regwrite(self, offset: O1N_REGS, reg: int):
+        self._cmd_write(self._nfi_base +
+                        MSM7200_NANDREGS.ADDR0.value, (offset.value) >> 1)
+        self._cmd_write(self._nfi_base + MSM7200_NANDREGS.GENP_REG0.value, reg)
+
+        self._cmd_write(
+            self._nfi_base + MSM7200_NANDREGS.SFLASHC_CMD.value, 3 | (1 << 20) | 0x30)
+        self._cmdexec()
+
+        while get_bit(self, self._nfi_base + MSM7200_NANDREGS.SFLASHC_STATUS.value, MSM7200_NAND_FLASH_STATUS_BITS_MASK.OPER_STATUS) != 0:
+            pass
+
+    def _regread(self, offset: O1N_REGS):
+        self._cmd_write(self._nfi_base +
+                        MSM7200_NANDREGS.ADDR0.value, (offset.value) >> 1)
+
+        self._cmd_write(
+            self._nfi_base + MSM7200_NANDREGS.SFLASHC_CMD.value, 2 | (1 << 20) | 0x10)
+        self._cmdexec()
+
+        while get_bit(self, self._nfi_base + MSM7200_NANDREGS.SFLASHC_STATUS.value, MSM7200_NAND_FLASH_STATUS_BITS_MASK.OPER_STATUS) != 0:
+            pass
+
+        return self._cmd_read(self._nfi_base + MSM7200_NANDREGS.GENP_REG0.value)
+
+    def _nandtobuf(self, offset: O1N_REGS, size: int):
+        temp = bytearray()
+        curOffset = offset.value
+
+        assert (size & 1) == 0
+        assert (offset.value & 1) == 0
+
+        while size > 0:
+            readSize = min(512, size)
+
+            self._cmd_write(self._nfi_base + MSM7200_NANDREGS.MACRO1_REG.value, curOffset >> 1)
+            self._cmd_write(
+                self._nfi_base + MSM7200_NANDREGS.SFLASHC_CMD.value, 6 | ((readSize >> 1) << 20) | 0x10)
+            self._cmdexec()
+
+            while get_bit(self, self._nfi_base + MSM7200_NANDREGS.SFLASHC_STATUS.value, MSM7200_NAND_FLASH_STATUS_BITS_MASK.OPER_STATUS) != 0:
+                pass
+
+            temp += self._mem_read(self._nfi_base + MSM7200_NANDREGS.FLASH_BUFFER.value, readSize)
+
+            curOffset += readSize
+            size -= readSize
+
+        return bytes(temp)
+
+    def read(self, page: int):
+        if self._ecc_enabled:
+            self._regwrite(O1N_REGS.REG_SYS_CFG1,
+                           self._regread(O1N_REGS.REG_SYS_CFG1) & ~0x100)
+        else:
+            self._regwrite(O1N_REGS.REG_SYS_CFG1,
+                           self._regread(O1N_REGS.REG_SYS_CFG1) | 0x100)
+
+        self._regwrite(O1N_REGS.REG_INTERRUPT, 0x0)
+        self._regwrite(O1N_REGS.REG_ECC_STATUS, 0x0)
+        self._regwrite(O1N_REGS.REG_START_BUFFER, 0x800)
+
+        UPPER_BANK = 0x8000 if self._ddp and (
+            page >> 6) >= self._density else 0x0
+
+        self._regwrite(O1N_REGS.REG_START_ADDRESS1,
+                       UPPER_BANK | ((page >> 6) & (self._density - 1)))
+        self._regwrite(O1N_REGS.REG_START_ADDRESS2, UPPER_BANK)
+
+        self._regwrite(O1N_REGS.REG_START_ADDRESS8, (page & 63) << 2)
+        self._regwrite(O1N_REGS.REG_COMMAND, O1N_NANDOPS.READ.value)
+
+        while (self._regread(O1N_REGS.REG_INTERRUPT) & 0x8080) != 0x8080:
+            pass
+
+        return self._nandtobuf(O1N_REGS.DATARAM, 0x800 if self._page_size == 0 else 0x1000), self._nandtobuf(O1N_REGS.SPARERAM, 0x40 if self._page_size == 0 else 0x80), b""
+
+
 def _moduletest():
     global _DEBUG_CONTROLLER
     _DEBUG_CONTROLLER = True
@@ -762,3 +915,9 @@ def _moduletest():
         dummy_cmd_read, dummy_cmd_write, dummy_mem_read, dummy_mem_write, raise_on_autoprobe_fail=False, bb_in_data=True)
     print("-READ")
     print(test.read(8))
+
+    print("7200_O1N")
+    test = MSM7200OneNANDController(
+        dummy_cmd_read, dummy_cmd_write, dummy_mem_read, dummy_mem_write)
+    print("-READ_BUF")
+    print(test._nandtobuf(O1N_REGS.DATARAM, 0x800))

@@ -1,4 +1,4 @@
-DUMPIT_VERSION = "0.92"
+DUMPIT_VERSION = "0.925"
 
 _interfaces = [
     (
@@ -213,7 +213,7 @@ _platforms_a = [
         "flash_buffer": 0x01800000,
         "flash_cmd": 0x01a00000,
         "flash_addr": 0x01900000,
-        "flash_wait": -1,        
+        "flash_wait": None,        
         "reg_width": 1,
         "wait_mask": 0,
         "init": [],
@@ -224,7 +224,7 @@ _platforms_a = [
         "flash_buffer": 0x02800000,
         "flash_cmd": 0x02a00000,
         "flash_addr": 0x02900000,
-        "flash_wait": -1,        
+        "flash_wait": None,        
         "reg_width": 1,
         "wait_mask": 0,
         "init": [],
@@ -648,6 +648,17 @@ _platforms_b = _platforms_b = [
         "init": [],
     },
     {
+        "name": "BCM2132",                
+        "mode": 5,
+        "flash_buffer": 0x07000000,
+        "flash_cmd": 0x07004000,
+        "flash_addr": 0x07008000,
+        "flash_wait": None,
+        "reg_width": 2,
+        "wait_mask": 0x40,
+        "init": [],
+    },
+    {
         "name": "BCM2133",
         "mode": 8,        
         "init": [],
@@ -672,10 +683,24 @@ _platforms_c = [
     {"name": "OneNAND PNX5230", "mode": 7, "o1n_offset": 0x48000000, "init": []},
     {"name": "OneNAND BCM2133", "mode": 7, "o1n_offset": 0x4000000, "init": []},
     {"name": "OneNAND BCM215x", "mode": 7, "o1n_offset": 0x400000, "init": []},
-    {"name": "OneNAND QSC62x0/QSC60x5", "mode": 7, "o1n_offset": 0x38000000, "init": []},
-    {"name": "OneNAND MSM62xx", "mode": 7, "o1n_offset": 0x40000000, "init": []},
+    {"name": "OneNAND QSC62x0/QSC60x5", "mode": 7, "o1n_offset": 0x38000000, "init": []}, # Corresponds to EBI2_CS0_N
+    {"name": "OneNAND MSM62xx", "mode": 7, "o1n_offset": 0x40000000, "init": []}, # Boot from OneNAND is supported on XMEM2_CS_N[3]
     {"name": "OneNAND OMAP850", "mode": 7, "o1n_offset": 0x0, "init": []},
-    {"name": "OneNAND MSM72xx", "mode": 7, "o1n_offset": 0x88000000, "init": []},
+    {"name": "OneNAND MSM720x (Type A)", "mode": 7, "o1n_offset": 0x88000000, "init": []},
+    {"name": "OneNAND MSM720x (Type B)", "mode": 7, "o1n_offset": 0x8c000000, "init": []},
+    {
+        "name": "OneNAND MSM722x", 
+        "mode": 10, 
+        "flash_regs": 0xA0A00000, 
+        "init": [
+            {
+                "name": "DISABLE_NAND_MPU",
+                "address": "A0B00000",
+                "type": 4,
+                "value": "0x0",
+            }
+        ]
+    },
     {"name": "NULL", "mode": -1, "init": []},
 ]
 

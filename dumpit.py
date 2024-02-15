@@ -117,7 +117,7 @@ def getOCDExec():
             os.path.dirname(__file__),
             f"ocd/{sys.platform}-{get_arch_platform()}/bin/openocd",
         )
-    
+
     elif os.path.exists(
         os.path.join(
             os.path.dirname(__file__),
@@ -127,7 +127,7 @@ def getOCDExec():
         return os.path.join(
             os.path.dirname(__file__),
             f"ocd/{sys.platform}-{get_arch_platform()}/bin/openocd.exe",
-        )    
+        )
 
     return os.path.join(f"ocd/{sys.platform}-{get_arch_platform()}/bin/openocd")
 
@@ -1356,7 +1356,8 @@ class MainApp(main.main):
                             self.idcode = p[1]["d"]
 
                     elif p[0] == "log" and (
-                        not self._logSupressed or p[1].startswith(b"Error:") or p[1].startswith(b"Warn :")
+                        not self._logSupressed or p[1].startswith(
+                            b"Error:") or p[1].startswith(b"Warn :")
                     ):
                         self._logThreadQueue.put(p[1])
 
@@ -2324,6 +2325,7 @@ class MainApp(main.main):
                         nand_int_addr=selPlat["flash_int"],
                         nand_op_reset_flag=selPlat["flash_nand_int"],
                         msm6550_discrepancy=selPlat["flash_has_header"],
+                        skip_init=self.skip_init,
                     )
                     assert NANDC._idcode not in [
                         0x0,
@@ -2389,6 +2391,8 @@ class MainApp(main.main):
                             else self.cNandSize.Selection
                         ),
                         page_width=self.page_width,
+                        skip_init=self.skip_init,
+                        skip_gpio_init=self.skip_gpio_init,
                     )
                     assert NANDC._idcode not in [
                         0x0,
@@ -2447,6 +2451,7 @@ class MainApp(main.main):
                             if self.cNandSize.Selection == 2
                             else self.cNandSize.Selection
                         ),
+                        skip_init=self.skip_init,
                     )
                     assert NANDC._idcode not in [
                         0x0,
@@ -2832,6 +2837,45 @@ class MainApp(main.main):
                         NANDC._density << 17
                     ), "Flash address is out of range"
 
+                elif selPlat["mode"] == 10:
+                    NANDC = qcom_nandregs.MSM7200OneNANDController(
+                        self.cmd_read_u32,
+                        self.cmd_write_u32,
+                        self.cmd_read_u8,
+                        None,
+                        selPlat["flash_regs"],
+                        page_size=(
+                            -1
+                            if self.cNandSize.Selection == 2
+                            else self.cNandSize.Selection
+                        ),
+                        skip_init=self.skip_init,
+                    )
+
+                    assert ((NANDC._idcode >> 24) & 0xff) not in [
+                        0xEC,
+                        0x20,
+                    ], "NAND detect failed"
+
+                    MFR_ID_HEX = f"0x{((NANDC._idcode >> 24) & 0xff):02x}"
+
+                    if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
+                        self._logThreadQueue.put(
+                            f'Found OneNAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}'
+                        )
+
+                    else:
+                        self._logThreadQueue.put(
+                            f"Found OneNAND with an idcode of {hex(NANDC._idcode)}, with unknown manufacturer"
+                        )
+
+                    self._logThreadQueue.put(
+                        f"Flash size: {NANDC._density >> 3}MB")
+
+                    assert cOffset < (NANDC._density << 17) and eOffset < (
+                        NANDC._density << 17
+                    ), "Flash address is out of range"
+
                 elif selPlat["mode"] == 8:
                     NANDC = bcm_nandregs.BCM2133NANDController(
                         self.cmd_read_u32,
@@ -2933,7 +2977,7 @@ class MainApp(main.main):
                                 cOffset
                                 >> (
                                     (11 if self.cNandSize.Selection == 1 else 9)
-                                    if selPlat["mode"] != 7
+                                    if selPlat["mode"] not in [7, 10]
                                     else (12 if self.cNandSize.Selection == 1 else 11)
                                 )
                             )
@@ -2944,7 +2988,7 @@ class MainApp(main.main):
 
                             cOffset += (
                                 (0x800 if self.cNandSize.Selection == 1 else 0x200)
-                                if selPlat["mode"] != 7
+                                if selPlat["mode"] not in [7, 10]
                                 else (
                                     0x1000 if self.cNandSize.Selection == 1 else 0x800
                                 )
@@ -2999,7 +3043,7 @@ class MainApp(main.main):
                                         cOffset
                                         >> (
                                             (11 if self.cNandSize.Selection == 1 else 9)
-                                            if selPlat["mode"] != 7
+                                            if selPlat["mode"] not in [7, 10]
                                             else (
                                                 12
                                                 if self.cNandSize.Selection == 1
@@ -3030,7 +3074,7 @@ class MainApp(main.main):
 
                                 cOffset += (
                                     (0x800 if self.cNandSize.Selection == 1 else 0x200)
-                                    if selPlat["mode"] != 7
+                                    if selPlat["mode"] not in [7, 10]
                                     else (
                                         0x1000
                                         if self.cNandSize.Selection == 1
@@ -3086,7 +3130,7 @@ class MainApp(main.main):
                                                     if self.cNandSize.Selection == 1
                                                     else 9
                                                 )
-                                                if selPlat["mode"] != 7
+                                                if selPlat["mode"] not in [7, 10]
                                                 else (
                                                     12
                                                     if self.cNandSize.Selection == 1
@@ -3105,7 +3149,7 @@ class MainApp(main.main):
                                                 if self.cNandSize.Selection == 1
                                                 else 0x200
                                             )
-                                            if selPlat["mode"] != 7
+                                            if selPlat["mode"] not in [7, 10]
                                             else (
                                                 0x1000
                                                 if self.cNandSize.Selection == 1
@@ -3178,15 +3222,19 @@ class MainApp(main.main):
                             self.metadata["device_name"],
                             self.metadata["device_manufacturer"],
                             (
-                                (0x1000 if (selPlat["mode"] == 7) else 0x800)
-                                if (NANDC is not None and NANDC._page_size == 1)
-                                else (0x800 if (selPlat["mode"] == 7) else 0x200)
+                                (0x800 if self.cNandSize.Selection == 1 else 0x200)
+                                if selPlat["mode"] not in [7, 10]
+                                else (
+                                    0x1000
+                                    if self.cNandSize.Selection == 1
+                                    else 0x800
+                                )
                             ),
                             self.idcode,
                             (
                                 0
                                 if NANDC is None
-                                else (2 if selPlat["mode"] == 7 else 1)
+                                else (1 if selPlat["mode"] not in [7, 10] else 2)
                             ),
                             self.remotePerformer
                             if self._isConnectRemote
@@ -3287,7 +3335,7 @@ class MainApp(main.main):
 
         flash_div = (
             (0x800 if self.cNandSize.Selection == 1 else 0x200)
-            if const._platforms[self.cChipset.Selection]["mode"] != 7
+            if const._platforms[self.cChipset.Selection]["mode"] not in [7, 10]
             else (0x1000 if self.cNandSize.Selection == 1 else 0x800)
         )
 
@@ -3393,11 +3441,8 @@ class MainApp(main.main):
             )
 
     def doScript(self, event):
-        if self._isConnectRemote:
-            return  # No way to execute scripts in Remote
-
         if not self._isConnect:
-            return
+            return  # No way to execute scripts in Remote
 
         with wx.FileDialog(
             self, "Load Script", wildcard="JIM TCL Script|*.tcl", style=wx.FD_OPEN
