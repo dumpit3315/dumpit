@@ -60,7 +60,7 @@ _additional_config = {
         "arm720t",
         "arm966e",
         "arm946e",
-        "arm926ejs",        
+        "arm926ejs",
     ],
 }
 _additional_config_unset = {
@@ -71,7 +71,7 @@ _additional_config_unset = {
         "arm720t",
         "arm966e",
         "arm946e",
-        "arm926ejs",        
+        "arm926ejs",
     ],
 }
 _dap_required = ["cortex_m", "cortex_a", "cortex_r4", "aarch64"]
@@ -213,7 +213,7 @@ _platforms_a = [
         "flash_buffer": 0x01800000,
         "flash_cmd": 0x01a00000,
         "flash_addr": 0x01900000,
-        "flash_wait": None,        
+        "flash_wait": None,
         "reg_width": 1,
         "wait_mask": 0,
         "init": [],
@@ -224,11 +224,11 @@ _platforms_a = [
         "flash_buffer": 0x02800000,
         "flash_cmd": 0x02a00000,
         "flash_addr": 0x02900000,
-        "flash_wait": None,        
+        "flash_wait": None,
         "reg_width": 1,
         "wait_mask": 0,
         "init": [],
-    },    
+    },
     {
         "name": "Megachips (Samsung Z107)",
         "mode": 5,
@@ -296,7 +296,8 @@ _platforms_a = [
             },
         ],
     },
-    {"name": "SEMC (DB2xxx, WIP)", "mode": 6, "flash_base": 0x24000000, "init": []},
+    {"name": "SEMC (DB2xxx, WIP)", "mode": 6,
+     "flash_base": 0x24000000, "init": []},
     {
         "name": "SEMC (DB3xxx)",
         "mode": 5,
@@ -312,7 +313,7 @@ _platforms_a = [
         "name": "MSM5100 (NAND, CDM-9500)",
         "mode": 9,
         "flash_buffer": 0x800000,
-        "flash_latch": 0x03000724,        
+        "flash_latch": 0x03000724,
         "flash_wait": 0x03000720,
         "reg_width": 2,
         "gpio_width": 4,
@@ -333,7 +334,7 @@ _platforms_b = _platforms_b = [
         "chip_width": 2,
         "bus_width": 2,
         "init": [
-        #    {"name": "SLEEP_CTL_WB", "address": "30006d0", "type": 4, "value": "0x1"}
+            #    {"name": "SLEEP_CTL_WB", "address": "30006d0", "type": 4, "value": "0x1"}
         ],
     },
     {
@@ -342,10 +343,10 @@ _platforms_b = _platforms_b = [
         "flash_regs": 0x0C000000,
         "flash_int_clear": -1,
         "flash_int": -1,
-        "flash_nand_int": 0x6000,        
+        "flash_nand_int": 0x6000,
         "flash_has_header": False,
         "init": [
-        #    {"name": "SLEEP_CTL_WB", "address": "30006d0", "type": 4, "value": "0x1"}
+            #    {"name": "SLEEP_CTL_WB", "address": "30006d0", "type": 4, "value": "0x1"}
         ],
     },
     {
@@ -354,7 +355,7 @@ _platforms_b = _platforms_b = [
         "flash_regs": 0x64000000,
         "flash_int_clear": 0x8400024C,
         "flash_int": 0x84000244,
-        "flash_nand_int": 0x6,        
+        "flash_nand_int": 0x6,
         "flash_has_header": False,
         "init": [
             {
@@ -388,28 +389,32 @@ _platforms_b = _platforms_b = [
                 "type": 4,
                 "value": "0x0033FC00",
             },
-            {"name": "EBI1_CS0_CFG1", "address": "600000B4", "type": 1, "value": "0x0"},
+            {"name": "EBI1_CS0_CFG1", "address": "600000B4",
+                "type": 1, "value": "0x0"},
             {
                 "name": "EBI1_CS1_CFG0",
                 "address": "600000B8",
                 "type": 4,
                 "value": "0x0033FC00",
             },
-            {"name": "EBI1_CS1_CFG1", "address": "600000BC", "type": 1, "value": "0x0"},
+            {"name": "EBI1_CS1_CFG1", "address": "600000BC",
+                "type": 1, "value": "0x0"},
             {
                 "name": "EBI1_CS2_CFG0",
                 "address": "600000C0",
                 "type": 4,
                 "value": "0x0033FC00",
             },
-            {"name": "EBI1_CS2_CFG1", "address": "600000C4", "type": 1, "value": "0x0"},
+            {"name": "EBI1_CS2_CFG1", "address": "600000C4",
+                "type": 1, "value": "0x0"},
             {
                 "name": "EBI1_CS3_CFG0",
                 "address": "600000C8",
                 "type": 4,
                 "value": "0x0033FC00",
             },
-            {"name": "EBI1_CS3_CFG1", "address": "600000CC", "type": 1, "value": "0x0"},
+            {"name": "EBI1_CS3_CFG1", "address": "600000CC",
+                "type": 1, "value": "0x0"},
             {
                 "name": "EBI1_MEM_CTLR_SEL_CM",
                 "address": "600000D0",
@@ -455,15 +460,15 @@ _platforms_b = _platforms_b = [
             {"name": "SLEEP_CTL_WB", "address": "80003404", "type": 4, "value": "0x1"},
             {"name": "GPIO_OE_0", "address": "84000150", "type": 4, "value": "0x8"},
         ],
-    },    
+    },
     {
         "name": "MSM6100/MSM6300",
         "mode": 1,
         "flash_regs": 0x64000000,
         "flash_int_clear": 0x80000C84,
         "flash_int": 0x80000C84,
-        "flash_nand_int": 0x6000,  
-        "flash_has_header": False,      
+        "flash_nand_int": 0x6000,
+        "flash_has_header": False,
         "init": [
             {"name": "", "address": "80001200", "type": 4, "value": "0xFFFFFFFF"},
             {"name": "", "address": "80001204", "type": 4, "value": "0xFFFFFFFF"},
@@ -483,8 +488,8 @@ _platforms_b = _platforms_b = [
         "flash_regs": 0x64000000,
         "flash_int_clear": 0x80000904,
         "flash_int": 0x80000950,
-        "flash_nand_int": 0x6000,     
-        "flash_has_header": False,   
+        "flash_nand_int": 0x6000,
+        "flash_has_header": False,
         "init": [
             {"name": "", "address": "80002200", "type": 4, "value": "0xFFFFFFFF"},
             {"name": "", "address": "80002204", "type": 4, "value": "0xFFFFFFFF"},
@@ -504,10 +509,10 @@ _platforms_b = _platforms_b = [
         "flash_regs": 0x60000000,
         "flash_int_clear": 0x80000904,
         "flash_int": 0x80000958,
-        "flash_nand_int": 0x6000,      
-        "flash_has_header": True,  
+        "flash_nand_int": 0x6000,
+        "flash_has_header": True,
         "init": [],
-    },    
+    },
     {
         "name": "MSM6275/MSM6800",
         "mode": 2,
@@ -544,7 +549,7 @@ _platforms_b = _platforms_b = [
         "flash_int": 0x80000C84,
         "flash_nand_int": 0x6000,
         "init": [],
-    },    
+    },
     {
         "name": "MSM6280/MSM6281",
         "mode": 2,
@@ -648,7 +653,7 @@ _platforms_b = _platforms_b = [
         "init": [],
     },
     {
-        "name": "BCM2132",                
+        "name": "BCM2132",
         "mode": 5,
         "flash_buffer": 0x07000000,
         "flash_cmd": 0x07004000,
@@ -660,7 +665,7 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "BCM2133",
-        "mode": 8,        
+        "mode": 8,
         "init": [],
     },
 ]
@@ -683,15 +688,19 @@ _platforms_c = [
     {"name": "OneNAND PNX5230", "mode": 7, "o1n_offset": 0x48000000, "init": []},
     {"name": "OneNAND BCM2133", "mode": 7, "o1n_offset": 0x4000000, "init": []},
     {"name": "OneNAND BCM215x", "mode": 7, "o1n_offset": 0x400000, "init": []},
-    {"name": "OneNAND QSC62x0/QSC60x5", "mode": 7, "o1n_offset": 0x38000000, "init": []}, # Corresponds to EBI2_CS0_N
-    {"name": "OneNAND MSM62xx", "mode": 7, "o1n_offset": 0x40000000, "init": []}, # Boot from OneNAND is supported on XMEM2_CS_N[3]
+    {"name": "OneNAND QSC62x0/QSC60x5", "mode": 7,
+        "o1n_offset": 0x38000000, "init": []},  # Corresponds to EBI2_CS0_N
+    {"name": "OneNAND MSM62xx", "mode": 7, "o1n_offset": 0x40000000,
+        "init": []},  # Boot from OneNAND is supported on XMEM2_CS_N[3]
     {"name": "OneNAND OMAP850", "mode": 7, "o1n_offset": 0x0, "init": []},
-    {"name": "OneNAND MSM720x (Type A)", "mode": 7, "o1n_offset": 0x88000000, "init": []},
-    {"name": "OneNAND MSM720x (Type B)", "mode": 7, "o1n_offset": 0x8c000000, "init": []},
+    {"name": "OneNAND MSM720x (Type A)", "mode": 7,
+     "o1n_offset": 0x88000000, "init": []},
+    {"name": "OneNAND MSM720x (Type B)", "mode": 7,
+     "o1n_offset": 0x8c000000, "init": []},
     {
-        "name": "OneNAND MSM722x", 
-        "mode": 10, 
-        "flash_regs": 0xA0A00000, 
+        "name": "OneNAND MSM722x",
+        "mode": 10,
+        "flash_regs": 0xA0A00000,
         "init": [
             {
                 "name": "DISABLE_NAND_MPU",
