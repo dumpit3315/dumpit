@@ -830,7 +830,8 @@ class MSM7200OneNANDController(_BaseQCOMNANDController):
         while size > 0:
             readSize = min(512, size)
 
-            self._cmd_write(self._nfi_base + MSM7200_NANDREGS.MACRO1_REG.value, curOffset >> 1)
+            self._cmd_write(self._nfi_base +
+                            MSM7200_NANDREGS.MACRO1_REG.value, curOffset >> 1)
             self._cmd_write(
                 self._nfi_base + MSM7200_NANDREGS.SFLASHC_CMD.value, 6 | ((readSize >> 1) << 20) | 0x10)
             self._cmdexec()
@@ -838,7 +839,8 @@ class MSM7200OneNANDController(_BaseQCOMNANDController):
             while get_bit(self, self._nfi_base + MSM7200_NANDREGS.SFLASHC_STATUS.value, MSM7200_NAND_FLASH_STATUS_BITS_MASK.OPER_STATUS) != 0:
                 pass
 
-            temp += self._mem_read(self._nfi_base + MSM7200_NANDREGS.FLASH_BUFFER.value, readSize)
+            temp += self._mem_read(self._nfi_base +
+                                   MSM7200_NANDREGS.FLASH_BUFFER.value, readSize)
 
             curOffset += readSize
             size -= readSize
