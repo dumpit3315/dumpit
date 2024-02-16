@@ -21,22 +21,22 @@ class PXA3NANDController():
             1 << pxa3.PXA3NDCR_BITS_MASK.NDCR_SPARE_EN.value[0])
 
         ndcr = set_bit_var(
-            ndcr, pxa3.PXA3NDCR_BITS_MASK.NDCR_RD_ID_CNT, 4 if page_size in [-1, 1] else 2)
+            ndcr, pxa3.PXA3NDCR_BITS_MASK.NDCR_RD_ID_CNT, 4 if self._page_size in [-1, 1] else 2)
         ndcr = set_bit_var(
             ndcr, pxa3.PXA3NDCR_BITS_MASK.NDCR_ND_ARB_EN, int(self._arbiter))
 
         ndcr = set_bit_var(
-            ndcr, pxa3.PXA3NDCR_BITS_MASK.NDCR_RA_START, 1 if page_size in [-1, 1] else 0)
+            ndcr, pxa3.PXA3NDCR_BITS_MASK.NDCR_RA_START, 1 if self._page_size in [-1, 1] else 0)
         ndcr = set_bit_var(
-            ndcr, pxa3.PXA3NDCR_BITS_MASK.NDCR_PG_PER_BLK, 1 if page_size == 1 else 0)
+            ndcr, pxa3.PXA3NDCR_BITS_MASK.NDCR_PG_PER_BLK, 1 if self._page_size == 1 else 0)
 
         ndcr = set_bit_var(
-            ndcr, pxa3.PXA3NDCR_BITS_MASK.NDCR_PAGE_SZ, 1 if page_size in [-1, 1] else 0)
+            ndcr, pxa3.PXA3NDCR_BITS_MASK.NDCR_PAGE_SZ, 1 if self._page_size in [-1, 1] else 0)
 
         ndcr = set_bit_var(
-            ndcr, pxa3.PXA3NDCR_BITS_MASK.NDCR_DWIDTH_C, 1 if page_width == 1 else 0)
+            ndcr, pxa3.PXA3NDCR_BITS_MASK.NDCR_DWIDTH_C, 1 if self._page_width == 1 else 0)
         ndcr = set_bit_var(
-            ndcr, pxa3.PXA3NDCR_BITS_MASK.NDCR_DWIDTH_M, 1 if page_width == 1 else 0)
+            ndcr, pxa3.PXA3NDCR_BITS_MASK.NDCR_DWIDTH_M, 1 if self._page_width == 1 else 0)
 
         self._cmd_write(0x43100000 + pxa3.PXA3NANDREGS.NDCR.value, ndcr)
 
@@ -104,7 +104,7 @@ class PXA3NANDController():
             temp_addr = page << 16
 
             self._cmd_write(0x43100000 + pxa3.PXA3NANDREGS.NDCB0.value, 0x3000 | (
-                5 << pxa3.PXA3NDCB_BITS_MASK.NDCB0_ADDR_CYC) | (1 << pxa3.PXA3NDCB_BITS_MASK.NDCB0_DBC.value[0]))
+                5 << pxa3.PXA3NDCB_BITS_MASK.NDCB0_ADDR_CYC.value[0]) | (1 << pxa3.PXA3NDCB_BITS_MASK.NDCB0_DBC.value[0]))
             self._cmd_write(
                 0x43100000 + pxa3.PXA3NANDREGS.NDCB1.value, temp_addr & 0xffffffff)
             self._cmd_write(
@@ -112,7 +112,7 @@ class PXA3NANDController():
 
         else:
             self._cmd_write(0x43100000 + pxa3.PXA3NANDREGS.NDCB0.value,
-                            0x00 | (4 << pxa3.PXA3NDCB_BITS_MASK.NDCB0_ADDR_CYC))
+                            0x00 | (4 << pxa3.PXA3NDCB_BITS_MASK.NDCB0_ADDR_CYC.value[0]))
             self._cmd_write(
                 0x43100000 + pxa3.PXA3NANDREGS.NDCB1.value, (page << 8) & 0xffffffff)
             self._cmd_write(0x43100000 + pxa3.PXA3NANDREGS.NDCB2.value, 0x00)
@@ -158,26 +158,26 @@ class PXA3NANDController():
 
         if self._page_size == 1:
             for _ in range(0x200):
-                temp = self._cmd_read(0x43100000 + pxa3.PXA3NANDREGS.NDDB)
+                temp = self._cmd_read(0x43100000 + pxa3.PXA3NANDREGS.NDDB.value[0])
                 for _ in range(4):
                     tempBuf.append(temp & 0xff)
                     temp >>= 8
 
             for _ in range(0x10):
-                temp = self._cmd_read(0x43100000 + pxa3.PXA3NANDREGS.NDDB)
+                temp = self._cmd_read(0x43100000 + pxa3.PXA3NANDREGS.NDDB.value[0])
                 for _ in range(4):
                     tempSpare.append(temp & 0xff)
                     temp >>= 8
 
         else:
             for _ in range(0x80):
-                temp = self._cmd_read(0x43100000 + pxa3.PXA3NANDREGS.NDDB)
+                temp = self._cmd_read(0x43100000 + pxa3.PXA3NANDREGS.NDDB.value[0])
                 for _ in range(4):
                     tempBuf.append(temp & 0xff)
                     temp >>= 8
 
             for _ in range(0x4):
-                temp = self._cmd_read(0x43100000 + pxa3.PXA3NANDREGS.NDDB)
+                temp = self._cmd_read(0x43100000 + pxa3.PXA3NANDREGS.NDDB.value[0])
                 for _ in range(4):
                     tempSpare.append(temp & 0xff)
                     temp >>= 8
