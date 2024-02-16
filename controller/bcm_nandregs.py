@@ -52,7 +52,7 @@ class BCM2133NANDController():
                     break
                 time.sleep(0.1)
 
-            while (self._cmd_read(0x8090000) & 0x40) == 0:
+            while (self._cmd_read(0x8090000) & 0x40) == 0 and not _DEBUG_CONTROLLER:
                 pass #time.sleep(0.1)
 
             for _ in range(4):
@@ -81,7 +81,7 @@ class BCM2133NANDController():
                     break
                 pass #time.sleep(0.01)
 
-            while (self._mem_read(0x809001c) & 0x2) == 0:
+            while (self._mem_read(0x809001c) & 0x2) == 0 and not _DEBUG_CONTROLLER:
                 pass
 
             tempData += self._mem_read(0x2298000,
@@ -104,7 +104,7 @@ class BCM2133NANDController():
                             break
                         pass #time.sleep(0.01)
 
-                    while (self._cmd_read(0x8090000) & 0x40) == 0:
+                    while (self._cmd_read(0x8090000) & 0x40) == 0 and not _DEBUG_CONTROLLER:
                         pass
 
                     tempData += self._mem_read(0x2298000, 0x100)
@@ -122,7 +122,7 @@ class BCM2133NANDController():
                             break
                         pass #time.sleep(0.01)
 
-                    while (self._cmd_read(0x8090000) & 0x40) == 0:
+                    while (self._cmd_read(0x8090000) & 0x40) == 0 and not _DEBUG_CONTROLLER:
                         pass
 
                     tempData += self._mem_read(0x2298000, 0x100)
@@ -140,7 +140,7 @@ class BCM2133NANDController():
                             break
                         pass #time.sleep(0.01)
 
-                    while (self._cmd_read(0x8090000) & 0x40) == 0:
+                    while (self._cmd_read(0x8090000) & 0x40) == 0 and not _DEBUG_CONTROLLER:
                         pass
 
                     tempSpare += self._mem_read(0x2298000, 0x10)
@@ -159,7 +159,7 @@ class BCM2133NANDController():
                             break
                         pass #time.sleep(0.01)
 
-                    while (self._cmd_read(0x8090000) & 0x40) == 0:
+                    while (self._cmd_read(0x8090000) & 0x40) == 0 and not _DEBUG_CONTROLLER:
                         pass
 
                     tempData += self._mem_read(0x2298000, 0x200)
@@ -177,7 +177,7 @@ class BCM2133NANDController():
                             break
                         pass #time.sleep(0.01)
 
-                    while (self._cmd_read(0x8090000) & 0x40) == 0:
+                    while (self._cmd_read(0x8090000) & 0x40) == 0 and not _DEBUG_CONTROLLER:
                         pass
 
                     tempSpare += self._mem_read(0x2298000, 0x10)
@@ -198,7 +198,7 @@ class BCM2133NANDController():
                         break
                     pass #time.sleep(0.01)
 
-                while (self._cmd_read(0x8090000) & 0x40) == 0:
+                while (self._cmd_read(0x8090000) & 0x40) == 0 and not _DEBUG_CONTROLLER:
                     pass
 
                 tempData += self._mem_read(0x2298000, 0x800)
@@ -213,3 +213,51 @@ class BCM2133NANDController():
 
     def erase(self, page: int):
         raise NotImplementedError()
+
+def _moduletest():
+    global _DEBUG_CONTROLLER
+    _DEBUG_CONTROLLER = True
+
+    def dummy_cmd_read(offset):
+        print(f"CMD READ {hex(offset)}")
+        return 0x0
+
+    def dummy_cmd_write(offset, value):
+        print(f"CMD WRITE {hex(offset)} {hex(value)} {bin(value)}")
+        
+    def dummy_cmd_read2(offset):
+        print(f"CMD READ2 {hex(offset)}")
+        return 0x0
+
+    def dummy_cmd_write2(offset, value):
+        print(f"CMD WRITE2 {hex(offset)} {hex(value)} {bin(value)}")
+
+    def dummy_mem_read(offset, size=1):
+        print(f"MEM READ {hex(offset)} {hex(size)}")
+        return 0xff if size <= 1 else b"\xff"*size
+
+    def dummy_mem_write(offset, data):
+        print(f"MEM WRITE {hex(offset)} {data}")
+        pass
+
+    print("-BCM-NANDC 512-8-")
+    test = BCM2133NANDController(dummy_cmd_read, dummy_cmd_write, dummy_cmd_read2, dummy_cmd_write2, dummy_mem_read, dummy_mem_write, 0, 0)
+    print("-READ-")
+    print(test.read(0))
+    
+    print("-BCM-NANDC 512-16-")
+    test = BCM2133NANDController(dummy_cmd_read, dummy_cmd_write, dummy_cmd_read2, dummy_cmd_write2, dummy_mem_read, dummy_mem_write, 0, 1)
+    print("-READ-")
+    print(test.read(0))
+    
+    print("-BCM-NANDC 2048-8-")
+    test = BCM2133NANDController(dummy_cmd_read, dummy_cmd_write, dummy_cmd_read2, dummy_cmd_write2, dummy_mem_read, dummy_mem_write, 1, 0)
+    print("-READ-")
+    print(test.read(0))
+    
+    print("-BCM-NANDC 2048-16-")
+    test = BCM2133NANDController(dummy_cmd_read, dummy_cmd_write, dummy_cmd_read2, dummy_cmd_write2, dummy_mem_read, dummy_mem_write, 1, 1)
+    print("-READ-")
+    print(test.read(0))
+    
+    

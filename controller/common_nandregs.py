@@ -59,14 +59,16 @@ class GenericNANDController():
                 self._cmd_write(self._nfi_ale, (page >> 16) & 0xff)
 
                 if self._int_read and self._nand_int is not None and self._nand_int_mask != 0:
-                    while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
-                        pass
+                    if not _DEBUG_CONTROLLER:
+                        while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
+                            pass
 
                 elif self._nand_int_mask != 0:
                     self._cmd_write(self._nfi_cle, 0x70)
 
-                    while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
-                        pass
+                    if not _DEBUG_CONTROLLER:
+                        while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
+                            pass
 
                     self._cmd_write(self._nfi_cle, 0x00)
 
@@ -85,14 +87,16 @@ class GenericNANDController():
                 self._cmd_write(self._nfi_ale, (page >> 16) & 0xff)
 
                 if self._int_read and self._nand_int is not None and self._nand_int_mask != 0:
-                    while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
-                        pass
+                    if not _DEBUG_CONTROLLER:
+                        while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
+                            pass
 
                 elif self._nand_int_mask != 0:
                     self._cmd_write(self._nfi_cle, 0x70)
 
-                    while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
-                        pass
+                    if not _DEBUG_CONTROLLER:
+                        while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
+                            pass
 
                     self._cmd_write(self._nfi_cle, 0x00)
 
@@ -111,14 +115,16 @@ class GenericNANDController():
                 self._cmd_write(self._nfi_ale, (page >> 16) & 0xff)
 
                 if self._int_read and self._nand_int is not None and self._nand_int_mask != 0:
-                    while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
-                        pass
+                    if not _DEBUG_CONTROLLER:
+                        while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
+                            pass
 
                 elif self._nand_int_mask != 0:
                     self._cmd_write(self._nfi_cle, 0x70)
 
-                    while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
-                        pass
+                    if not _DEBUG_CONTROLLER:
+                        while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
+                            pass
 
                     self._cmd_write(self._nfi_cle, 0x00)
 
@@ -138,14 +144,16 @@ class GenericNANDController():
                 self._cmd_write(self._nfi_ale, (page >> 16) & 0xff)
 
                 if self._int_read and self._nand_int is not None and self._nand_int_mask != 0:
-                    while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
-                        pass
+                    if not _DEBUG_CONTROLLER:
+                        while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
+                            pass
 
                 elif self._nand_int_mask != 0:
                     self._cmd_write(self._nfi_cle, 0x70)
 
-                    while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
-                        pass
+                    if not _DEBUG_CONTROLLER:
+                        while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
+                            pass
 
                     self._cmd_write(self._nfi_cle, 0x00)
 
@@ -165,14 +173,16 @@ class GenericNANDController():
                 self._cmd_write(self._nfi_ale, (page >> 16) & 0xff)
 
                 if self._int_read and self._nand_int is not None and self._nand_int_mask != 0:
-                    while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
-                        pass
+                    if not _DEBUG_CONTROLLER:
+                        while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
+                            pass
 
                 elif self._nand_int_mask != 0:
                     self._cmd_write(self._nfi_cle, 0x70)
 
-                    while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
-                        pass
+                    if not _DEBUG_CONTROLLER:
+                        while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
+                            pass
 
                     self._cmd_write(self._nfi_cle, 0x00)
 
@@ -195,14 +205,16 @@ class GenericNANDController():
             self._cmd_write(self._nfi_cle, 0x30)
 
             if self._int_read and self._nand_int is not None and self._nand_int_mask != 0:
-                while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
-                    pass
+                if not _DEBUG_CONTROLLER:
+                    while ((self._int_read(self._nand_int) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._int_read(self._nand_int) & self._nand_int_mask) != 0):
+                        pass
 
             elif self._nand_int_mask != 0:
                 self._cmd_write(self._nfi_cle, 0x70)
 
-                while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
-                    pass
+                if not _DEBUG_CONTROLLER:
+                    while ((self._data_read(self._nfi_data) & self._nand_int_mask) == 0) if not self._wait_invert else ((self._data_read(self._nfi_data) & self._nand_int_mask) != 0):
+                        pass
 
                 self._cmd_write(self._nfi_cle, 0x00)
 
@@ -300,8 +312,9 @@ class GenericNANDControllerGPIO():
                     0x00, [0x00, (page & 0xff), ((page >> 8) & 0xff), ((page >> 16) & 0xff)])
 
                 if self._nfi_busy != -1 and self._nfi_rb_mask:
-                    while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
-                        pass
+                    if not _DEBUG_CONTROLLER:
+                        while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
+                            pass
 
                 else:
                     time.sleep(0.1)
@@ -314,8 +327,9 @@ class GenericNANDControllerGPIO():
                     0x01, [0x00, (page & 0xff), ((page >> 8) & 0xff), ((page >> 16) & 0xff)])
 
                 if self._nfi_busy != -1 and self._nfi_rb_mask != -1:
-                    while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
-                        pass
+                    if not _DEBUG_CONTROLLER:
+                        while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
+                            pass
 
                 else:
                     time.sleep(0.1)
@@ -328,8 +342,9 @@ class GenericNANDControllerGPIO():
                     0x50, [0x00, (page & 0xff), ((page >> 8) & 0xff), ((page >> 16) & 0xff)])
 
                 if self._nfi_busy != -1 and self._nfi_rb_mask != -1:
-                    while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
-                        pass
+                    if not _DEBUG_CONTROLLER:
+                        while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
+                            pass
 
                 else:
                     time.sleep(0.1)
@@ -343,8 +358,9 @@ class GenericNANDControllerGPIO():
                     0x00, [0x00, (page & 0xff), ((page >> 8) & 0xff), ((page >> 16) & 0xff)])
 
                 if self._nfi_busy != -1 and self._nfi_rb_mask != -1:
-                    while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
-                        pass
+                    if not _DEBUG_CONTROLLER:
+                        while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
+                            pass
 
                 else:
                     time.sleep(0.1)
@@ -358,8 +374,9 @@ class GenericNANDControllerGPIO():
                     0x50, [0x00, (page & 0xff), ((page >> 8) & 0xff), ((page >> 16) & 0xff)])
 
                 if self._nfi_busy != -1 and self._nfi_rb_mask != -1:
-                    while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
-                        pass
+                    if not _DEBUG_CONTROLLER:
+                        while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
+                            pass
 
                 else:
                     time.sleep(0.1)
@@ -374,8 +391,9 @@ class GenericNANDControllerGPIO():
             self._send_cmd(0x30)
 
             if self._nfi_busy != -1 and self._nfi_rb_mask != -1:
-                while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
-                    pass
+                if not _DEBUG_CONTROLLER:
+                    while ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) == 0) if not self._wait_invert else ((self._gpio_read(self._nfi_busy) & self._nfi_rb_mask) != 0):
+                        pass
 
             else:
                 time.sleep(0.1)
@@ -490,7 +508,7 @@ class OneNANDController():
         self._cmd_write(self._o1n_base +
                         O1N_REGS.REG_COMMAND.value, O1N_NANDOPS.HOT_RESET.value)
 
-        while (self._cmd_read(self._o1n_base + O1N_REGS.REG_INTERRUPT.value) & 0x8000) != 0x8000:
+        while (self._cmd_read(self._o1n_base + O1N_REGS.REG_INTERRUPT.value) & 0x8000) != 0x8000 and not _DEBUG_CONTROLLER:
             pass # time.sleep(0.05)
 
         self._idcode = (self._cmd_read(self._o1n_base + O1N_REGS.REG_MANUFACTURER_ID.value)
@@ -529,7 +547,7 @@ class OneNANDController():
         self._cmd_write(self._o1n_base +
                         O1N_REGS.REG_COMMAND.value, O1N_NANDOPS.READ.value)
 
-        while (self._cmd_read(self._o1n_base + O1N_REGS.REG_INTERRUPT.value) & 0x8080) != 0x8080:
+        while (self._cmd_read(self._o1n_base + O1N_REGS.REG_INTERRUPT.value) & 0x8080) != 0x8080 and not _DEBUG_CONTROLLER:
             pass
 
         return self._data_read(self._o1n_base + O1N_REGS.DATARAM.value, 0x800 if self._o1n_size == 0 else 0x1000), self._data_read(self._o1n_base + O1N_REGS.SPARERAM.value, 0x40 if self._o1n_size == 0 else 0x80), b""
@@ -539,3 +557,62 @@ class OneNANDController():
 
     def erase(self, page: int):
         raise NotImplementedError()
+
+def _moduletest():
+    global _DEBUG_CONTROLLER
+    _DEBUG_CONTROLLER = True
+
+    def dummy_cmd_read(offset):
+        print(f"CMD READ {hex(offset)}")
+        return 0x0
+
+    def dummy_cmd_write(offset, value):
+        print(f"CMD WRITE {hex(offset)} {hex(value)} {bin(value)}")
+
+    def dummy_mem_read(offset, size=1):
+        print(f"MEM READ {hex(offset)} {hex(size)}")
+        return 0xff if size <= 1 else b"\xff"*size
+
+    def dummy_mem_write(offset, data):
+        print(f"MEM WRITE {hex(offset)} {data}")
+        pass
+
+    print("-NANDC 512-8-")
+    test = GenericNANDController(dummy_cmd_write, dummy_mem_read, dummy_mem_write, "little", dummy_cmd_read, 0x800000, 0x900000, 0xa00000, 0xc003154, 0x40, 0, 0)
+    print("-READ-")
+    print(test.read(0))
+    
+    print("-NANDC 512-16-")
+    test = GenericNANDController(dummy_cmd_write, dummy_mem_read, dummy_mem_write, "little", dummy_cmd_read, 0x800000, 0x900000, 0xa00000, 0xc003154, 0x40, 0, 1)
+    print("-READ-")
+    print(test.read(0))
+    
+    print("-NANDC 2048-8-")
+    test = GenericNANDController(dummy_cmd_write, dummy_mem_read, dummy_mem_write, "little", dummy_cmd_read, 0x800000, 0x900000, 0xa00000, 0xc003154, 0x40, 1, 0)
+    print("-READ-")
+    print(test.read(0))
+    
+    print("-NANDC 2048-16-")
+    test = GenericNANDController(dummy_cmd_write, dummy_mem_read, dummy_mem_write, "little", dummy_cmd_read, 0x800000, 0x900000, 0xa00000, 0xc003154, 0x40, 1, 1)
+    print("-READ-")
+    print(test.read(0))
+    
+    print("-NANDC-GPIO 512-8-")
+    test = GenericNANDControllerGPIO(dummy_cmd_read, dummy_cmd_write, dummy_mem_read, dummy_mem_write, "little", 0xc003150, 0x800000, 0x80, 0x100, 0xc003155, 0x10, 0, 0)
+    print("-READ-")
+    print(test.read(0))
+    
+    print("-NANDC-GPIO 512-16-")
+    test = GenericNANDControllerGPIO(dummy_cmd_read, dummy_cmd_write, dummy_mem_read, dummy_mem_write, "little", 0xc003150, 0x800000, 0x80, 0x100, 0xc003155, 0x10, 0, 1)
+    print("-READ-")
+    print(test.read(0))
+    
+    print("-NANDC-GPIO 2048-8-")
+    test = GenericNANDControllerGPIO(dummy_cmd_read, dummy_cmd_write, dummy_mem_read, dummy_mem_write, "little", 0xc003150, 0x800000, 0x80, 0x100, 0xc003155, 0x10, 1, 0)
+    print("-READ-")
+    print(test.read(0))
+    
+    print("-NANDC-GPIO 2048-16-")
+    test = GenericNANDControllerGPIO(dummy_cmd_read, dummy_cmd_write, dummy_mem_read, dummy_mem_write, "little", 0xc003150, 0x800000, 0x80, 0x100, 0xc003155, 0x10, 1, 1)
+    print("-READ-")
+    print(test.read(0))

@@ -620,7 +620,8 @@ class MSM7200NANDController(_BaseQCOMNANDController):
         self._idcode = 0
         for i in range(4):
             self._idcode <<= 8
-            self._idcode |= ((tempIDCode >> (i * 8)) & 0xff)
+            self._idcode |= tempIDCode & 0xff
+            tempIDCode >>= 8
 
         self._isFirst = False
         self._reset_first = False
@@ -773,7 +774,7 @@ class MSM7200OneNANDController(_BaseQCOMNANDController):
         self._regwrite(O1N_REGS.REG_INTERRUPT, 0x0)
 
         self._regwrite(O1N_REGS.REG_COMMAND, O1N_NANDOPS.HOT_RESET.value)
-        while (self._regread(O1N_REGS.REG_INTERRUPT) & 0x8000) != 0x8000:
+        while (self._regread(O1N_REGS.REG_INTERRUPT) & 0x8000) != 0x8000 and not _DEBUG_CONTROLLER:
             pass #time.sleep(0.1)
 
         self._idcode = (self._regread(O1N_REGS.REG_MANUFACTURER_ID)
@@ -868,7 +869,7 @@ class MSM7200OneNANDController(_BaseQCOMNANDController):
         self._regwrite(O1N_REGS.REG_START_ADDRESS8, (page & 63) << 2)
         self._regwrite(O1N_REGS.REG_COMMAND, O1N_NANDOPS.READ.value)
 
-        while (self._regread(O1N_REGS.REG_INTERRUPT) & 0x8080) != 0x8080:
+        while (self._regread(O1N_REGS.REG_INTERRUPT) & 0x8080) != 0x8080 and not _DEBUG_CONTROLLER:
             pass
 
         return self._nandtobuf(O1N_REGS.DATARAM, 0x800 if self._page_size == 0 else 0x1000), self._nandtobuf(O1N_REGS.SPARERAM, 0x40 if self._page_size == 0 else 0x80), b""
@@ -885,9 +886,9 @@ def _moduletest():
     def dummy_cmd_write(offset, value):
         print(f"CMD WRITE {hex(offset)} {hex(value)} {bin(value)}")
 
-    def dummy_mem_read(offset, size):
+    def dummy_mem_read(offset, size=1):
         print(f"MEM READ {hex(offset)} {hex(size)}")
-        return b"\xff"*size
+        return 0xff if size <= 1 else b"\xff"*size
 
     def dummy_mem_write(offset, data):
         print(f"MEM WRITE {hex(offset)} {data}")

@@ -14,6 +14,8 @@ class PXA3NANDController():
 
         self._page_width = page_width
         self._page_size = page_size
+        
+        self._cs = devid
 
         prev_ndcr = self._cmd_read(0x43100000 + pxa3.PXA3NANDREGS.NDCR.value)
 
@@ -52,7 +54,7 @@ class PXA3NANDController():
         set_bit(self, 0x43100000 + pxa3.PXA3NANDREGS.NDCR.value,
                 pxa3.PXA3NDCR_BITS_MASK.NDCR_ND_RUN, 1)
 
-        while get_bit(self, 0x43100000 + pxa3.PXA3NANDREGS.NDSR.value, pxa3.PXA3NDSR_BITS_MASK.NDSR_WRCMDREQ) == 0:
+        while get_bit(self, 0x43100000 + pxa3.PXA3NANDREGS.NDSR.value, pxa3.PXA3NDSR_BITS_MASK.NDSR_WRCMDREQ) == 0 and not _DEBUG_CONTROLLER:
             pass
 
     def _pxa_end(self):
@@ -63,14 +65,14 @@ class PXA3NANDController():
         self._pxa_start()
 
         self._cmd_write(0x43100000 + pxa3.PXA3NANDREGS.NDCB0.value,
-                        0xff | (5 << pxa3.PXA3NDCB_BITS_MASK.NDCB0_CMD_TYPE.value[0]))
+                        0xff | (5 << pxa3.PXA3NDCB_BITS_MASK.NDCB0_CMD_TYPE.value[0]) | (self._cs << pxa3.PXA3NDCB_BITS_MASK.NDCB0_CSEL.value[0]))
         self._cmd_write(0x43100000 + pxa3.PXA3NANDREGS.NDCB1.value, 0x00)
         self._cmd_write(0x43100000 + pxa3.PXA3NANDREGS.NDCB2.value, 0x00)
 
-        while get_bit(self, 0x43100000 + pxa3.PXA3NANDREGS.NDSR.value, pxa3.PXA3NDSR_BITS_MASK.NDSR_CS0_CMDD) == 0:
+        while get_bit(self, 0x43100000 + pxa3.PXA3NANDREGS.NDSR.value, pxa3.PXA3NDSR_BITS_MASK.NDSR_CS0_CMDD) == 0 and not _DEBUG_CONTROLLER:
             pass
 
-        for _ in range(0x4000):
+        for _ in range(0x4000 if not _DEBUG_CONTROLLER else 0x8):
             if get_bit(self, 0x43100000 + pxa3.PXA3NANDREGS.NDSR.value, pxa3.PXA3NDSR_BITS_MASK.NDSR_RDY) != 0:
                 break
 
@@ -80,18 +82,21 @@ class PXA3NANDController():
         self._pxa_start()
 
         self._cmd_write(0x43100000 + pxa3.PXA3NANDREGS.NDCB0.value,
-                        0x90 | (3 << pxa3.PXA3NDCB_BITS_MASK.NDCB0_CMD_TYPE.value[0]))
+                        0x90 | (3 << pxa3.PXA3NDCB_BITS_MASK.NDCB0_CMD_TYPE.value[0]) | (1 << pxa3.PXA3NDCB_BITS_MASK.NDCB0_ADDR_CYC.value[0]) | (self._cs << pxa3.PXA3NDCB_BITS_MASK.NDCB0_CSEL.value[0]))
         self._cmd_write(0x43100000 + pxa3.PXA3NANDREGS.NDCB1.value, 0x00)
         self._cmd_write(0x43100000 + pxa3.PXA3NANDREGS.NDCB2.value, 0x00)
 
-        while get_bit(self, 0x43100000 + pxa3.PXA3NANDREGS.NDSR.value, pxa3.PXA3NDSR_BITS_MASK.NDSR_RDDREQ) == 0:
+        while get_bit(self, 0x43100000 + pxa3.PXA3NANDREGS.NDSR.value, pxa3.PXA3NDSR_BITS_MASK.NDSR_RDDREQ) == 0 and not _DEBUG_CONTROLLER:
             pass
+
+        temp = self._cmd_read(
+                0x43100000 + pxa3.PXA3NANDREGS.NDDB.value)
 
         idcode = 0
         for _ in range(4):
             idcode <<= 8
-            idcode |= self._cmd_read(
-                0x43100000 + pxa3.PXA3NANDREGS.NDDB.value) & 0xff
+            idcode |= temp & 0xff
+            temp >>= 8
 
         self._pxa_end()
 
@@ -104,7 +109,7 @@ class PXA3NANDController():
             temp_addr = page << 16
 
             self._cmd_write(0x43100000 + pxa3.PXA3NANDREGS.NDCB0.value, 0x3000 | (
-                5 << pxa3.PXA3NDCB_BITS_MASK.NDCB0_ADDR_CYC.value[0]) | (1 << pxa3.PXA3NDCB_BITS_MASK.NDCB0_DBC.value[0]))
+                5 << pxa3.PXA3NDCB_BITS_MASK.NDCB0_ADDR_CYC.value[0]) | (1 << pxa3.PXA3NDCB_BITS_MASK.NDCB0_DBC.value[0]) | (self._cs << pxa3.PXA3NDCB_BITS_MASK.NDCB0_CSEL.value[0]))
             self._cmd_write(
                 0x43100000 + pxa3.PXA3NANDREGS.NDCB1.value, temp_addr & 0xffffffff)
             self._cmd_write(
@@ -112,12 +117,12 @@ class PXA3NANDController():
 
         else:
             self._cmd_write(0x43100000 + pxa3.PXA3NANDREGS.NDCB0.value,
-                            0x00 | (4 << pxa3.PXA3NDCB_BITS_MASK.NDCB0_ADDR_CYC.value[0]))
+                            0x00 | (4 << pxa3.PXA3NDCB_BITS_MASK.NDCB0_ADDR_CYC.value[0]) | (self._cs << pxa3.PXA3NDCB_BITS_MASK.NDCB0_CSEL.value[0]))
             self._cmd_write(
                 0x43100000 + pxa3.PXA3NANDREGS.NDCB1.value, (page << 8) & 0xffffffff)
             self._cmd_write(0x43100000 + pxa3.PXA3NANDREGS.NDCB2.value, 0x00)
 
-        while get_bit(self, 0x43100000 + pxa3.PXA3NANDREGS.NDSR.value, pxa3.PXA3NDSR_BITS_MASK.NDSR_RDDREQ) == 0:
+        while get_bit(self, 0x43100000 + pxa3.PXA3NANDREGS.NDSR.value, pxa3.PXA3NDSR_BITS_MASK.NDSR_RDDREQ) == 0 and not _DEBUG_CONTROLLER:
             pass
 
     def read(self, page: int):
@@ -158,26 +163,26 @@ class PXA3NANDController():
 
         if self._page_size == 1:
             for _ in range(0x200):
-                temp = self._cmd_read(0x43100000 + pxa3.PXA3NANDREGS.NDDB.value[0])
+                temp = self._cmd_read(0x43100000 + pxa3.PXA3NANDREGS.NDDB.value)
                 for _ in range(4):
                     tempBuf.append(temp & 0xff)
                     temp >>= 8
 
             for _ in range(0x10):
-                temp = self._cmd_read(0x43100000 + pxa3.PXA3NANDREGS.NDDB.value[0])
+                temp = self._cmd_read(0x43100000 + pxa3.PXA3NANDREGS.NDDB.value)
                 for _ in range(4):
                     tempSpare.append(temp & 0xff)
                     temp >>= 8
 
         else:
             for _ in range(0x80):
-                temp = self._cmd_read(0x43100000 + pxa3.PXA3NANDREGS.NDDB.value[0])
+                temp = self._cmd_read(0x43100000 + pxa3.PXA3NANDREGS.NDDB.value)
                 for _ in range(4):
                     tempBuf.append(temp & 0xff)
                     temp >>= 8
 
             for _ in range(0x4):
-                temp = self._cmd_read(0x43100000 + pxa3.PXA3NANDREGS.NDDB.value[0])
+                temp = self._cmd_read(0x43100000 + pxa3.PXA3NANDREGS.NDDB.value)
                 for _ in range(4):
                     tempSpare.append(temp & 0xff)
                     temp >>= 8
@@ -221,3 +226,26 @@ def set_bit_var(var: int, bits: enum.Enum, value: int):
         print(
             f"SBV: ({hex(var)} & ~{hex(bitMask)}) | (({hex(value)} & {hex(bits.value[1])}) << {bits.value[0]})")
     return (var & ~bitMask) | ((value & bits.value[1]) << bits.value[0])
+
+
+def _moduletest():
+    global _DEBUG_CONTROLLER
+    _DEBUG_CONTROLLER = True
+
+    def dummy_cmd_read(offset):
+        print(f"CMD READ {hex(offset)}")
+        return 0x0
+
+    def dummy_cmd_write(offset, value):
+        print(f"CMD WRITE {hex(offset)} {hex(value)} {bin(value)}")
+
+    print("-PXA 512-")
+    test = PXA3NANDController(dummy_cmd_read, dummy_cmd_write, False, 0, 0)
+    print("-READ-")
+    print(test.read(0))
+    
+    print("-PXA 2048-")
+    test = PXA3NANDController(dummy_cmd_read, dummy_cmd_write, False, 1, 0)
+    print("-READ-")
+    print(test.read(0))
+    
