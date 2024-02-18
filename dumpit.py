@@ -3161,9 +3161,9 @@ class MainApp(main.main):
                             data, spare, bbm = NANDC.read(
                                 cOffset
                                 >> (
-                                    (11 if self.cNandSize.Selection == 1 else 9)
+                                    (11 if NANDC._page_size == 1 else 9)
                                     if selPlat["mode"] not in [7, 10]
-                                    else (12 if self.cNandSize.Selection == 1 else 11)
+                                    else (12 if NANDC._page_size == 1 else 11)
                                 )
                             )
 
