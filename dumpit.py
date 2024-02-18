@@ -1615,20 +1615,28 @@ class MainApp(main.main):
 
                 resTemp += t
 
+            if self._debug_logs:
+                print(f"OUT {cmd}: {resTemp}")
+
             if _return:
                 return resTemp.decode("latin-1")
 
             else:
-                print(f"SINK: {resTemp}")
+                # print(f"SINK: {resTemp}")
                 return ""
 
         elif self._sio and self._sio.connected:
             self._sio.emit("data", cmd)
+            resTemp = self._sioMsgQueue.get(timeout=10)
+
+            if self._debug_logs:
+                print(f"OUT {cmd}: {resTemp}")
+
             if _return:
-                return self._sioMsgQueue.get(timeout=10)
+                return resTemp
 
             else:
-                print(f"SINK: {self._sioMsgQueue.get(timeout=10)}")
+                # print(f"SINK: {self._sioMsgQueue.get(timeout=10)}")
                 return ""
 
         else:
@@ -2946,14 +2954,14 @@ class MainApp(main.main):
                 elif selPlat["mode"] == 11:
                     NANDC = pxa3_nandregs.PXA3NANDController(
                         self.cmd_read_u32,
-                        self.cmd_write_u32,                        
+                        self.cmd_write_u32,
                         page_size=(
                             -1
                             if self.cNandSize.Selection == 2
                             else self.cNandSize.Selection
                         ),
                         page_width=self.page_width
-                    )                    
+                    )
 
                     _msleep(const._jtag_init_delay)
 
