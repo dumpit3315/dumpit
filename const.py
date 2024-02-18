@@ -175,6 +175,7 @@ _platforms_a = [
     },
     {
         "name": "MSM5100/MSM5500/MSM6000",
+        "platform": "arm7tdmi",
         "mode": 4,
         "chip_width": 2,
         "bus_width": 2,
@@ -209,6 +210,7 @@ _platforms_a = [
     },
     {
         "name": "MSM5100/MSM5500 (NAND)",
+        "platform": "arm7tdmi",
         "mode": 5,
         "flash_buffer": 0x01800000,
         "flash_cmd": 0x01a00000,
@@ -220,6 +222,7 @@ _platforms_a = [
     },
     {
         "name": "MSM5100/MSM5500 (NAND, Type B)",
+        "platform": "arm7tdmi",
         "mode": 5,
         "flash_buffer": 0x02800000,
         "flash_cmd": 0x02a00000,
@@ -231,6 +234,7 @@ _platforms_a = [
     },
     {
         "name": "Megachips (Samsung Z107)",
+        "platform": "arm7tdmi",
         "mode": 5,
         "flash_buffer": 0x04000000,
         "flash_cmd": 0x04200000,
@@ -242,6 +246,7 @@ _platforms_a = [
     },
     {
         "name": "Sysol (Samsung, Type 1)",
+        "platform": "arm7tdmi",
         "mode": 5,
         "flash_buffer": 0x04000000,
         "flash_cmd": 0x04000004,
@@ -253,6 +258,7 @@ _platforms_a = [
     },
     {
         "name": "Sysol (Samsung, Type 2)",
+        "platform": "arm7tdmi",
         "mode": 5,
         "flash_buffer": 0x01800000,
         "flash_cmd": 0x01800004,
@@ -264,6 +270,7 @@ _platforms_a = [
     },
     {
         "name": "SEMC (PNX5230)",
+        "platform": "arm946e",
         "mode": 5,
         "flash_buffer": 0x40000000,
         "flash_cmd": 0x40400000,
@@ -275,6 +282,7 @@ _platforms_a = [
     },
     {
         "name": "PNX67xx (WIP)",
+        "platform": "arm926ejs",
         "mode": 5,
         "flash_buffer": 0xC1300000,
         "flash_cmd": 0xC1300004,
@@ -311,6 +319,7 @@ _platforms_a = [
     },
     {
         "name": "MSM5100 (NAND, CDM-9500)",
+        "platform": "arm7tdmi",
         "mode": 9,
         "flash_buffer": 0x800000,
         "flash_latch": 0x03000724,
@@ -330,6 +339,7 @@ _platforms_a = [
 _platforms_b = _platforms_b = [
     {
         "name": "MSM6025/MSM6050",
+        "platform": "arm7tdmi",
         "mode": 4,
         "chip_width": 2,
         "bus_width": 2,
@@ -339,6 +349,7 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "MSM6025/MSM6050 (NAND controller)",
+        "platform": "arm7tdmi",
         "mode": 1,
         "flash_regs": 0x0C000000,
         "flash_int_clear": -1,
@@ -351,6 +362,7 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "MSM6250/MSM6250A/MSM6225",
+        "platform": "arm926ejs",
         "mode": 1,
         "flash_regs": 0x64000000,
         "flash_int_clear": 0x8400024C,
@@ -463,6 +475,7 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "MSM6100/MSM6300",
+        "platform": "arm926ejs",
         "mode": 1,
         "flash_regs": 0x64000000,
         "flash_int_clear": 0x80000C84,
@@ -484,6 +497,7 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "MSM6500/MSM6125",
+        "platform": "arm926ejs",
         "mode": 1,
         "flash_regs": 0x64000000,
         "flash_int_clear": 0x80000904,
@@ -505,6 +519,7 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "MSM6550/MSM6150",
+        "platform": "arm926ejs",
         "mode": 1,
         "flash_regs": 0x60000000,
         "flash_int_clear": 0x80000904,
@@ -515,6 +530,7 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "MSM6275/MSM6800",
+        "platform": "arm926ejs",
         "mode": 2,
         "flash_regs": 0x60000000,
         "flash_int_clear": 0x80000414,
@@ -527,6 +543,7 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "MSM6245/MSM6260(A)/ESM6235/MSM6801/MSM6246",
+        "platform": "arm926ejs",
         "mode": 2,
         "flash_regs": 0x60000000,
         "flash_int_clear": 0x80000414,
@@ -536,6 +553,7 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "QSC60x0",
+        "platform": "arm926ejs",
         "mode": 4,
         "chip_width": 2,
         "bus_width": 2,
@@ -543,6 +561,7 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "QSC60x0 (NAND controller)",
+        "platform": "arm926ejs",
         "mode": 2,
         "flash_regs": 0x64000000,
         "flash_int_clear": 0x80000C84,
@@ -552,6 +571,7 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "MSM6280/MSM6281",
+        "platform": "arm926ejs",
         "mode": 2,
         "flash_regs": 0x60000000,
         "flash_int_clear": 0x80000414,
@@ -561,6 +581,7 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "MSM7200/MSM7200A/MSM7201A/MSM7500/MSM7500A/MSM7501A/QSD8x50",
+        "platform": ["arm926ejs", "arm11"],
         "mode": 3,
         "flash_regs": 0xA0A00000,
         "jtag_ctl": 0xA900026C,
@@ -581,6 +602,7 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "MSM72xx",
+        "platform": ["arm926ejs", "arm11"],
         "mode": 3,
         "flash_regs": 0xA0A00000,
         "jtag_ctl": 0xA900026C,
@@ -595,6 +617,7 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "MDM66xx/QSC61xx",
+        "platform": ["arm11"],
         "mode": 3,
         "flash_regs": 0x70000000,
         "init": [
@@ -608,6 +631,7 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "MSM7x30",
+        "platform": ["cortex_a"],
         "mode": 3,
         "flash_regs": 0xA0200000,
         "jtag_ctl": 0xABE0026C,
@@ -627,7 +651,7 @@ _platforms_b = _platforms_b = [
         ],
     },
     {
-        "name": "MDM9600",
+        "name": "MDM9600",        
         "mode": 3,
         "flash_regs": 0x81200000,
         "jtag_ctl": 0x9404026C,
@@ -648,12 +672,14 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "QSC60x5/62x0",
+        "platform": "arm926ejs",
         "mode": 3,
         "flash_regs": 0x60008000,
         "init": [],
     },
     {
         "name": "BCM2132",
+        "platform": "arm926ejs",
         "mode": 5,
         "flash_buffer": 0x07000000,
         "flash_cmd": 0x07004000,
@@ -665,6 +691,7 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "BCM2133",
+        "platform": "arm926ejs",
         "mode": 8,
         "init": [],
     },
@@ -675,30 +702,33 @@ _platforms_b = _platforms_b = [
 _platforms_c = [
     {
         "name": "OneNAND PCF5213 (Type A)",
+        "platform": "arm946e",
         "mode": 7,
         "o1n_offset": 0x28000000,
         "init": [],
     },
     {
         "name": "OneNAND PCF5213 (Type B)",
+        "platform": "arm946e",
         "mode": 7,
         "o1n_offset": 0x20000000,
         "init": [],
     },
-    {"name": "OneNAND PNX5230", "mode": 7, "o1n_offset": 0x48000000, "init": []},
-    {"name": "OneNAND BCM2133", "mode": 7, "o1n_offset": 0x4000000, "init": []},
+    {"name": "OneNAND PNX5230", "platform": "arm946e", "mode": 7, "o1n_offset": 0x48000000, "init": []},
+    {"name": "OneNAND BCM2133", "platform": "arm926ejs", "mode": 7, "o1n_offset": 0x4000000, "init": []},
     {"name": "OneNAND BCM215x", "mode": 7, "o1n_offset": 0x400000, "init": []},
-    {"name": "OneNAND QSC62x0/QSC60x5", "mode": 7,
+    {"name": "OneNAND QSC62x0/QSC60x5", "platform": "arm926ejs", "mode": 7,
         "o1n_offset": 0x38000000, "init": []},  # Corresponds to EBI2_CS0_N
-    {"name": "OneNAND MSM62xx", "mode": 7, "o1n_offset": 0x40000000,
+    {"name": "OneNAND MSM62xx", "platform": "arm926ejs", "mode": 7, "o1n_offset": 0x40000000,
         "init": []},  # Boot from OneNAND is supported on XMEM2_CS_N[3]
     {"name": "OneNAND OMAP850", "mode": 7, "o1n_offset": 0x0, "init": []},
-    {"name": "OneNAND MSM720x (Type A)", "mode": 7,
+    {"name": "OneNAND MSM720x (Type A)", "platform": "arm926ejs", "mode": 7,
      "o1n_offset": 0x88000000, "init": []},
-    {"name": "OneNAND MSM720x (Type B)", "mode": 7,
+    {"name": "OneNAND MSM720x (Type B)", "platform": "arm926ejs", "mode": 7,
      "o1n_offset": 0x8c000000, "init": []},
     {
         "name": "OneNAND MSM722x",
+        "platform": "arm926ejs",
         "mode": 10,
         "flash_regs": 0xA0A00000,
         "init": [

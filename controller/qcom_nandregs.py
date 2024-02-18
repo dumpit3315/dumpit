@@ -536,7 +536,7 @@ class MSM7200_NANDREGS(enum.Enum):
 
 
 class MSM7200_NANDOPS(enum.Enum):
-    RESET = 0x01
+    RESET = 0x31
     PAGE_READ = 0x32
     PAGE_READ_ECC = 0x33
     PAGE_READ_ALL = 0x34
