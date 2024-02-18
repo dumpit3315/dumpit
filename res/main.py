@@ -169,6 +169,7 @@ class main ( wx.Frame ):
 		bSizer6111.Add( self.bECCDisable, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 		self.bBadBlockinData = wx.CheckBox( self.dPage1, wx.ID_ANY, u"Bad Blocks on Data", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.bBadBlockinData.SetValue(True)
 		bSizer6111.Add( self.bBadBlockinData, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 

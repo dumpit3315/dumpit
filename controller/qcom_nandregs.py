@@ -710,6 +710,7 @@ class MSM7200NANDController(_BaseQCOMNANDController):
             temp_mem = self._mem_read(self._nfi_base +
                                       MSM7200_NANDREGS.FLASH_BUFFER.value, 0x210)
 
+            '''
             if self._bb_in_data:
                 tempbuf += temp_mem[:0x1d0] + temp_mem[0x1d2:0x202]
                 tempbuf_bbm += temp_mem[0x1d0:0x1d2]
@@ -718,6 +719,10 @@ class MSM7200NANDController(_BaseQCOMNANDController):
             else:
                 tempbuf += temp_mem[:0x200]
                 tempbuf_spare += temp_mem[0x200:]
+            '''
+
+            tempbuf += temp_mem[:0x200]
+            tempbuf_spare += temp_mem[0x200:]
 
         return bytes(tempbuf), bytes(tempbuf_spare), bytes(tempbuf_bbm)
 
