@@ -723,6 +723,7 @@ class MSM7200NANDController(_BaseQCOMNANDController):
 
             tempbuf += temp_mem[:0x200]
             tempbuf_spare += temp_mem[0x200:]
+            tempbuf_bbm += (self._cmd_read(self._nfi_base + MSM7200_NANDREGS.BUFFER_STATUS) >> 16).to_bytes(2, "little")
 
         return bytes(tempbuf), bytes(tempbuf_spare), bytes(tempbuf_bbm)
 
