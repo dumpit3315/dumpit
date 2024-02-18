@@ -75,8 +75,8 @@ _additional_config_unset = {
     ],
 }
 _dap_required = ["cortex_m", "cortex_a", "cortex_r4", "aarch64"]
-_init_normal = "jtag newtap target cpu -irlen (IR)(XPARAM); target create target.cpu (TYPE) -endian (ENDIAN) -chain-position target.cpu; "
-_init_dap = "jtag newtap target cpu -irlen (IR)(XPARAM); dap create target.dap -chain-position target.cpu; target create target.cpu (TYPE) -endian (ENDIAN) -dap target.dap; "
+_init_normal = "jtag newtap target(TARGETID) cpu -irlen (IR)(XPARAM); target create target(TARGETID).cpu (TYPE) -endian (ENDIAN) -chain-position target(TARGETID).cpu; "
+_init_dap = "jtag newtap target(TARGETID) cpu -irlen (IR)(XPARAM); dap create target.dap -chain-position target(TARGETID).cpu; target create target(TARGETID).cpu (TYPE) -endian (ENDIAN) -dap target.dap; "
 _reset_type = [
     ("None", "none"),
     ("TRST only", "trst_only"),
@@ -246,7 +246,7 @@ _platforms_a = [
     },
     {
         "name": "Sysol (Samsung, Type 1)",
-        "platform": "arm7tdmi",
+        "platform": "arm7tdmi-be",
         "mode": 5,
         "flash_buffer": 0x04000000,
         "flash_cmd": 0x04000004,
@@ -258,7 +258,7 @@ _platforms_a = [
     },
     {
         "name": "Sysol (Samsung, Type 2)",
-        "platform": "arm7tdmi",
+        "platform": "arm7tdmi-be",
         "mode": 5,
         "flash_buffer": 0x01800000,
         "flash_cmd": 0x01800004,
@@ -679,7 +679,7 @@ _platforms_b = _platforms_b = [
     },
     {
         "name": "BCM2132",
-        "platform": "arm926ejs",
+        "platform": "arm926ejs-be",
         "mode": 5,
         "flash_buffer": 0x07000000,
         "flash_cmd": 0x07004000,

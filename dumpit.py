@@ -2076,7 +2076,7 @@ class MainApp(main.main):
         if not self._isConnect and not self._isConnectRemote:
             return b""
         try:
-            return int(self._ocdSendCommand("jtag cget target.cpu -idcode"))
+            return int(self._ocdSendCommand("jtag cget target0.cpu -idcode"))
 
         except Exception:
             return 0
@@ -3132,6 +3132,17 @@ class MainApp(main.main):
                     if self._isConnectRemote and self._sio:
                         self._sio.emit("command", {"c": "initDone"})
 
+            if self.cNandSize.Selection == 2 and NANDC is not None:
+                flash_div = (
+                    (0x800 if NANDC._page_size == 1 else 0x200)
+                    if const._platforms[self.cChipset.Selection]["mode"] not in [7, 10]
+                    else (0x1000 if NANDC._page_size == 1 else 0x800)
+                )
+
+                if (cOffset % flash_div) != 0 or (eOffset % flash_div) != 0:
+                    raise Exception(
+                        f"offset not divisible by {hex(flash_div)} is not supported")
+
             time.sleep(1)
             self._logSupressed = True
             self._logThreadQueue.put(
@@ -3172,10 +3183,10 @@ class MainApp(main.main):
                             bbBuf += bbm
 
                             cOffset += (
-                                (0x800 if self.cNandSize.Selection == 1 else 0x200)
+                                (0x800 if NANDC._page_size == 1 else 0x200)
                                 if selPlat["mode"] not in [7, 10]
                                 else (
-                                    0x1000 if self.cNandSize.Selection == 1 else 0x800
+                                    0x1000 if NANDC._page_size == 1 else 0x800
                                 )
                             )
 
@@ -3227,11 +3238,11 @@ class MainApp(main.main):
                                     data, spare, bbm = NANDC.read(
                                         cOffset
                                         >> (
-                                            (11 if self.cNandSize.Selection == 1 else 9)
+                                            (11 if NANDC._page_size == 1 else 9)
                                             if selPlat["mode"] not in [7, 10]
                                             else (
                                                 12
-                                                if self.cNandSize.Selection == 1
+                                                if NANDC._page_size == 1
                                                 else 11
                                             )
                                         )
@@ -3258,11 +3269,11 @@ class MainApp(main.main):
                                 bbBuf += bbm
 
                                 cOffset += (
-                                    (0x800 if self.cNandSize.Selection == 1 else 0x200)
+                                    (0x800 if NANDC._page_size == 1 else 0x200)
                                     if selPlat["mode"] not in [7, 10]
                                     else (
                                         0x1000
-                                        if self.cNandSize.Selection == 1
+                                        if NANDC._page_size == 1
                                         else 0x800
                                     )
                                 )
@@ -3312,13 +3323,13 @@ class MainApp(main.main):
                                             >> (
                                                 (
                                                     11
-                                                    if self.cNandSize.Selection == 1
+                                                    if NANDC._page_size == 1
                                                     else 9
                                                 )
                                                 if selPlat["mode"] not in [7, 10]
                                                 else (
                                                     12
-                                                    if self.cNandSize.Selection == 1
+                                                    if NANDC._page_size == 1
                                                     else 11
                                                 )
                                             )
@@ -3331,13 +3342,13 @@ class MainApp(main.main):
                                         cOffset += (
                                             (
                                                 0x800
-                                                if self.cNandSize.Selection == 1
+                                                if NANDC._page_size == 1
                                                 else 0x200
                                             )
                                             if selPlat["mode"] not in [7, 10]
                                             else (
                                                 0x1000
-                                                if self.cNandSize.Selection == 1
+                                                if NANDC._page_size == 1
                                                 else 0x800
                                             )
                                         )
@@ -3406,12 +3417,12 @@ class MainApp(main.main):
                             ],
                             self.metadata["device_name"],
                             self.metadata["device_manufacturer"],
-                            (
-                                (0x800 if self.cNandSize.Selection == 1 else 0x200)
+                            0x200 if NANDC is None else (
+                                (0x800 if NANDC._page_size == 1 else 0x200)
                                 if selPlat["mode"] not in [7, 10]
                                 else (
                                     0x1000
-                                    if self.cNandSize.Selection == 1
+                                    if NANDC._page_size == 1
                                     else 0x800
                                 )
                             ),
@@ -3520,7 +3531,7 @@ class MainApp(main.main):
                 self,
             )
 
-        flash_div = (
+        flash_div = 1 if self.cNandSize.Selection == 2 else (
             (0x800 if self.cNandSize.Selection == 1 else 0x200)
             if const._platforms[self.cChipset.Selection]["mode"] not in [7, 10]
             else (0x1000 if self.cNandSize.Selection == 1 else 0x800)
@@ -4092,9 +4103,14 @@ def getInitCmd(self: MainApp):
     else:
         INIT_CMD += f"adapter speed {self.nSpeed.Value}; "
 
+    t = -1
+    isBig = False
+    
+    targets = []
+    endianTargets = []
+
     if self.cTarget.Selection >= 1:
-        t = self.cTarget.Selection
-        isBig = False
+        t = self.cTarget.Selection        
 
         if t >= self._beTarget:
             isBig = True
@@ -4102,7 +4118,30 @@ def getInitCmd(self: MainApp):
 
         else:
             t -= 1
+            
+        targets.append(t)
+        endianTargets.append(isBig)
+            
+    elif "platform" in const._platforms[self.cChipset.Selection]:
+        if isinstance(const._platforms[self.cChipset.Selection]["platform"], str):
+            isBig = const._platforms[self.cChipset.Selection]["platform"].endswith("-be")
+            t = const._targets.index(const._platforms[self.cChipset.Selection]["platform"].rstrip("-be"))
+            
+            targets.append(t)
+            endianTargets.append(isBig)
+            
+        else:
+            for p in const._platforms[self.cChipset.Selection]["platform"]:
+                isBig = p.endswith("-be")
+                t = const._targets.index(p.rstrip("-be"))
+            
+                targets.append(t)
+                endianTargets.append(isBig)
+            
+        
+    if len(targets) <= 0: raise Exception("You must manually specify the target")
 
+    for k, t in enumerate(targets):
         fixedIR = 0
         for v in const._force_ir:
             if const._targets[t] in const._force_ir[v]:
@@ -4122,7 +4161,8 @@ def getInitCmd(self: MainApp):
                 )
                 .replace("(XPARAM)", "")
                 .replace("(TYPE)", const._targets[t])
-                .replace("(ENDIAN)", "big" if isBig else "little")
+                .replace("(ENDIAN)", "big" if endianTargets[k] else "little")
+                .replace("(TARGETID)", str(k))
             )
 
         else:
@@ -4132,48 +4172,49 @@ def getInitCmd(self: MainApp):
                 )
                 .replace("(XPARAM)", "")
                 .replace("(TYPE)", const._targets[t])
-                .replace("(ENDIAN)", "big" if isBig else "little")
+                .replace("(ENDIAN)", "big" if endianTargets[k] else "little")
+                .replace("(TARGETID)", str(k))
             )
 
-        self._cfi_start_offset = 0
+    self._cfi_start_offset = 0
 
-        if self._loaded_dcc is not None:
-            path_escaped = pathlib.Path(self._loaded_dcc).as_posix()
-            INIT_CMD += (
-                "flash bank target.dcc ocl 0 0 0 0 target.cpu; set _DCC_PATH {"
-                + path_escaped
-                + "}; "
-                + f"set _DCC_START_OFFSET {hex(intelhex.IntelHex(self._loaded_dcc).minaddr())}; "
-            )
-            INIT_CMD += 'proc test_flash {} { flash probe 0; for {set i 0} {$i < 0x04000000} {incr i 0x10000} { set v [flash read_bank_memory 0 $i 0x10000]; echo "Flash read on: 0x[format %X $i]"; }; echo "read is all done"; }; '
+    if self._loaded_dcc is not None:
+        path_escaped = pathlib.Path(self._loaded_dcc).as_posix()
+        INIT_CMD += (
+            "flash bank target.dcc ocl 0 0 0 0 target0.cpu; set _DCC_PATH {"
+            + path_escaped
+            + "}; "
+            + f"set _DCC_START_OFFSET {hex(intelhex.IntelHex(self._loaded_dcc).minaddr())}; "
+        )
+        INIT_CMD += 'proc test_flash {} { flash probe 0; for {set i 0} {$i < 0x04000000} {incr i 0x10000} { set v [flash read_bank_memory 0 $i 0x10000]; echo "Flash read on: 0x[format %X $i]"; }; echo "read is all done"; }; '
 
-        elif const._platforms[self.cChipset.Selection]["mode"] == -1:
-            INIT_CMD += "flash bank target.dcc dummy_flash 0 0 0 0 target.cpu; "
-            INIT_CMD += 'proc test_flash {} { flash probe 0; for {set i 0} {$i < 0x04000000} {incr i 0x10000} { set v [flash read_bank_memory 0 $i 0x10000]; echo "Flash read on: 0x[format %X $i]"; }; echo "read is all done"; }; '
+    elif const._platforms[self.cChipset.Selection]["mode"] == -1:
+        INIT_CMD += "flash bank target.dcc dummy_flash 0 0 0 0 target0.cpu; "
+        INIT_CMD += 'proc test_flash {} { flash probe 0; for {set i 0} {$i < 0x04000000} {incr i 0x10000} { set v [flash read_bank_memory 0 $i 0x10000]; echo "Flash read on: 0x[format %X $i]"; }; echo "read is all done"; }; '
 
-        elif const._platforms[self.cChipset.Selection]["mode"] == 4:
-            INIT_CMD += f"flash bank target.nor cfi 0x{self.tStart.Value} {hex(int(self.tEnd.Value, 16) - int(self.tStart.Value, 16))} {const._platforms[self.cChipset.Selection]['chip_width']} {const._platforms[self.cChipset.Selection]['bus_width']} target.cpu; flash bank target.dcc ocl 0 0 0 0 target.cpu; "
-            INIT_CMD += 'proc test_flash {} { flash probe 0; for {set i 0} {$i < 0x04000000} {incr i 0x10000} { set v [flash read_bank_memory 0 $i 0x10000]; echo "Flash read on: 0x[format %X $i]"; }; echo "read is all done"; }; '
-            self._cfi_start_offset = int(self.tStart.Value, 16)
+    elif const._platforms[self.cChipset.Selection]["mode"] == 4:
+        INIT_CMD += f"flash bank target.nor cfi 0x{self.tStart.Value} {hex(int(self.tEnd.Value, 16) - int(self.tStart.Value, 16))} {const._platforms[self.cChipset.Selection]['chip_width']} {const._platforms[self.cChipset.Selection]['bus_width']} target0.cpu; flash bank target.dcc ocl 0 0 0 0 target0.cpu; "
+        INIT_CMD += 'proc test_flash {} { flash probe 0; for {set i 0} {$i < 0x04000000} {incr i 0x10000} { set v [flash read_bank_memory 0 $i 0x10000]; echo "Flash read on: 0x[format %X $i]"; }; echo "read is all done"; }; '
+        self._cfi_start_offset = int(self.tStart.Value, 16)
 
-        INIT_CMD += additionalCFG
+    INIT_CMD += additionalCFG
 
-        INIT_CMD += "target.cpu configure -event examine-end { halt; sleep 2000; "
-        if not self.bSkipInit.Value:
-            for i in const._platforms[self.cChipset.Selection]["init"]:
-                if i["type"] == 1:
-                    INIT_CMD += f"mwb 0x{i['address']} {i['value']}; "
+    INIT_CMD += "target0.cpu configure -event examine-end { halt; sleep 2000; "
+    if not self.bSkipInit.Value:
+        for i in const._platforms[self.cChipset.Selection]["init"]:
+            if i["type"] == 1:
+                INIT_CMD += f"mwb 0x{i['address']} {i['value']}; "
 
-                elif i["type"] == 2:
-                    INIT_CMD += f"mwh 0x{i['address']} {i['value']}; "
+            elif i["type"] == 2:
+                INIT_CMD += f"mwh 0x{i['address']} {i['value']}; "
 
-                elif i["type"] == 4:
-                    INIT_CMD += f"mww 0x{i['address']} {i['value']}; "
+            elif i["type"] == 4:
+                INIT_CMD += f"mww 0x{i['address']} {i['value']}; "
 
-                elif i["type"] == 8:
-                    INIT_CMD += f"mwd 0x{i['address']} {i['value']}; "
+            elif i["type"] == 8:
+                INIT_CMD += f"mwd 0x{i['address']} {i['value']}; "
 
-        INIT_CMD += "}"
+    INIT_CMD += "}"
 
     return INIT_CMD
 

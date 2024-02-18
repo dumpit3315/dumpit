@@ -495,7 +495,7 @@ class OneNANDController():
         self._ecc_enabled = True
 
         self._o1n_base = base
-        self._o1n_size = nand_size
+        self._page_size = nand_size
 
         self._cmd_write(self._o1n_base + O1N_REGS.REG_SYS_CFG1.value, 0x40c0)
 
@@ -550,7 +550,7 @@ class OneNANDController():
         while (self._cmd_read(self._o1n_base + O1N_REGS.REG_INTERRUPT.value) & 0x8080) != 0x8080 and not _DEBUG_CONTROLLER:
             pass
 
-        return self._data_read(self._o1n_base + O1N_REGS.DATARAM.value, 0x800 if self._o1n_size == 0 else 0x1000), self._data_read(self._o1n_base + O1N_REGS.SPARERAM.value, 0x40 if self._o1n_size == 0 else 0x80), b""
+        return self._data_read(self._o1n_base + O1N_REGS.DATARAM.value, 0x800 if self._page_size == 0 else 0x1000), self._data_read(self._o1n_base + O1N_REGS.SPARERAM.value, 0x40 if self._page_size == 0 else 0x80), b""
 
     def write(self, page: int, data: typing.Union[bytes, bytearray]):
         raise NotImplementedError()
