@@ -241,7 +241,7 @@ class MSM6250NANDController(_BaseQCOMNANDController):
                 return self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 2, 0x200), self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 0x202, 0xe) + b"\xff\xff", self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value, 0x2)
 
             else:
-                return self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 1, 0x200), self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 0x201, 0xf) + b"\xff", self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value, 0x1)
+                return self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 1, 0x200), self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 0x201, 0xf) + b"\xff", self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value, 0x1).to_bytes(1, "little")
 
         else:
             return self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value, 0x200), self._mem_read(self._nfi_base + MSM6250_NANDREGS.FLASH_BUFFER.value + 0x200, 0x10), b""
