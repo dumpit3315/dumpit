@@ -696,6 +696,9 @@ class NANDControllerConfig(nandControlConfig.NANDControllerConfig):
         self.tCustomCFG1.Value = f"{self.base_parent.custom_cfg1:02x}"
         self.tCustomCFG2.Value = f"{self.base_parent.custom_cfg2:02x}"
         self.tCustomCFGCMN.Value = f"{self.base_parent.custom_cfg_common:02x}"
+        
+        self.bDisableMSM6550Quirks.Value = not self.base_parent.msm6550_discrepancy
+        self.bUseFastAPI.Value = self.base_parent.fast_api
 
         self.init_code = self.base_parent.nand_init_code
 
@@ -707,6 +710,9 @@ class NANDControllerConfig(nandControlConfig.NANDControllerConfig):
         self.base_parent.custom_cfg1 = int(self.tCustomCFG1.Value, 16)
         self.base_parent.custom_cfg2 = int(self.tCustomCFG2.Value, 16)
         self.base_parent.custom_cfg_common = int(self.tCustomCFGCMN.Value, 16)
+
+        self.base_parent.msm6550_discrepancy = not self.bDisableMSM6550Quirks.Value
+        self.base_parent.fast_api = self.bUseFastAPI.Value
 
         self.base_parent.nand_init_code = self.init_code
         self.EndModal(0)
@@ -731,6 +737,8 @@ class TargetReadConfig(targetReadConfig.TargetReadConfig):
         self.bCheckIdentical.Value = self.base_parent.check_identical_reads
         self.bDisablePerformanceOpts.Value = self.base_parent.disable_platform_options
         self.cIdenticalMode.Selection = self.base_parent.identical_check_mode
+        
+        self.cOutFormat.Selection = self.base_parent.nand_format
 
     def doChangeReadSize(self, event):
         self.tReadSize.Label = f"{self.sReadSize.Value*0x100} bytes"
@@ -743,6 +751,7 @@ class TargetReadConfig(targetReadConfig.TargetReadConfig):
         self.base_parent.check_identical_reads = self.bCheckIdentical.Value
         self.base_parent.disable_platform_options = self.bDisablePerformanceOpts.Value
         self.base_parent.identical_check_mode = self.cIdenticalMode.Selection
+        self.base_parent.nand_format = self.cOutFormat.Selection
 
         t = self.base_parent.cTarget.Selection
         isBig = False
@@ -1005,6 +1014,11 @@ class MainApp(main.main):
             "lender": "",
         }
 
+        self.msm6550_discrepancy = True
+        # 0 = Spare at the end, 1 = Interleaved (Standard), 2 = Split, 3 = No Spare
+        self.nand_format = 0
+        self.fast_api = True
+
         self.remotePerformer = ""
         self.remoteAssistant = ""
         self.remoteLender = ""
@@ -1161,6 +1175,12 @@ class MainApp(main.main):
                 self.page_width = cfg["nand_page_width"]
             if "nand_init_code" in cfg:
                 self.nand_init_code = cfg["nand_init_code"]
+            if "msm6550_discrepancy" in cfg:
+                self.msm6550_discrepancy = cfg["msm6550_discrepancy"]
+            if "nand_out_format" in cfg:
+                self.nand_format = cfg["nand_out_format"]
+            if "use_fast_api" in cfg:
+                self.fast_api = cfg["use_fast_api"]
 
             if "read_size" in cfg:
                 self.nor_read_size = cfg["read_size"]
@@ -1259,6 +1279,9 @@ class MainApp(main.main):
             cfg["nand_page_width"] = self.page_width
 
             cfg["nand_init_code"] = self.nand_init_code
+            cfg["msm6550_discrepancy"] = self.msm6550_discrepancy
+            cfg["nand_out_format"] = self.nand_format
+            cfg["use_fast_api"] = self.fast_api
 
             cfg["read_size"] = self.nor_read_size
             cfg["max_read_pass"] = self.max_read_pass
@@ -1314,7 +1337,8 @@ class MainApp(main.main):
                             self._isInitDone = False
 
                         elif p[1]["c"] == "progress":
-                            self.progress.Value = p[1]["d"]
+                            self.progress.Value = p[1]["d"][0]
+                            self.sPageStatus.SetStatusText(p[1]["d"][1])
 
                         elif p[1]["c"] == "isRead":
                             if p[1]["d"]:
@@ -1410,7 +1434,8 @@ class MainApp(main.main):
                             self._isInitDone = False
 
                         elif p[1]["c"] == "progress":
-                            self.progress.Value = p[1]["d"]
+                            self.progress.Value = p[1]["d"][0]
+                            self.sPageStatus.SetStatusText(p[1]["d"][1])
 
                         elif p[1]["c"] == "isRead":
                             if p[1]["d"]:
@@ -1524,12 +1549,13 @@ class MainApp(main.main):
             try:
                 p = self._progMsgQueue.get_nowait()
                 self.progress.Value = min(
-                    self.progress.Range, int(p * self.progress.Range)
+                    self.progress.Range, int(p[0] * self.progress.Range)
                 )
+                self.sPageStatus.SetStatusText(p[1])
                 if self._isConnectRemote and self._sio:
                     self._sio.emit(
-                        "command", {"c": "progress", "d": int(
-                            p * self.progress.Range)}
+                        "command", {"c": "progress", "d": [int(
+                            p[0] * self.progress.Range), p[1]]}
                     )
 
             except queue.Empty:
@@ -2210,17 +2236,26 @@ class MainApp(main.main):
 
         CFI_READ_BUFFER = self.nor_read_size
 
+        read_times = []
+
         try:
             with open(name, "wb") as tempFile:
                 while cOffset < eOffset and not self._isReadCanceled:
+                    readTimeStart = time.perf_counter()
                     tempFile.write(
                         self.cmd_read_u8(
                             cOffset, min(CFI_READ_BUFFER, eOffset - cOffset)
                         )
                     )
                     cOffset += min(CFI_READ_BUFFER, eOffset - cOffset)
+                    readTimeEnd = time.perf_counter()
 
-                    self._progMsgQueue.put(cOffset / eOffset)
+                    read_times.append(readTimeEnd-readTimeStart)
+                    if len(read_times) > 50:
+                        read_times.pop(0)
+
+                    self._progMsgQueue.put(
+                        [cOffset / eOffset, f"Read {hex(cOffset)} of {hex(eOffset)}, average time of last 50 commands: {round(sum(read_times)/len(read_times), 4)}"])
 
             self._logThreadQueue.put(
                 f"Dump memory finished {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}"
@@ -2333,7 +2368,7 @@ class MainApp(main.main):
                         nand_int_clr_addr=selPlat["flash_int_clear"],
                         nand_int_addr=selPlat["flash_int"],
                         nand_op_reset_flag=selPlat["flash_nand_int"],
-                        msm6550_discrepancy=selPlat["flash_has_header"],
+                        msm6550_discrepancy=False if not self.msm6550_discrepancy else selPlat["flash_has_header"],
                         skip_init=self.skip_init,
                     )
                     assert NANDC._idcode not in [
@@ -3154,11 +3189,15 @@ class MainApp(main.main):
 
             CFI_READ_BUFFER = self.nor_read_size
 
+            read_times = []
+
             with open(name, "wb") as tempFile:
                 sOffset = cOffset
 
                 if not self.check_identical_reads:
                     while cOffset < eOffset and not self._isReadCanceled:
+                        readTimeStart = time.perf_counter()
+
                         if self._loaded_dcc is not None or selPlat["mode"] in [-1, 4]:
                             tempFile.write(
                                 self.cmd_read_flash(
@@ -3182,6 +3221,9 @@ class MainApp(main.main):
                             spareBuf += spare
                             bbBuf += bbm
 
+                            if self.nand_format == 1:
+                                tempFile.write(spare)
+
                             cOffset += (
                                 (0x800 if NANDC._page_size == 1 else 0x200)
                                 if selPlat["mode"] not in [7, 10]
@@ -3193,13 +3235,22 @@ class MainApp(main.main):
                         else:
                             raise NotImplementedError()
 
-                        self._progMsgQueue.put(cOffset / eOffset)
+                        readTimeEnd = time.perf_counter()
+
+                        read_times.append(readTimeEnd-readTimeStart)
+                        if len(read_times) > 50:
+                            read_times.pop(0)
+
+                        self._progMsgQueue.put(
+                            [cOffset / eOffset, f"Read {hex(cOffset)} of {hex(eOffset)}, average time of last 50 commands: {round(sum(read_times)/len(read_times), 4)}"])
 
                 else:
                     if self.identical_check_mode == 0:
                         inconsistentReads = []
 
                         while cOffset < eOffset and not self._isReadCanceled:
+                            readTimeStart = time.perf_counter()
+
                             checkTemp = []
                             checkTempHash = []
 
@@ -3264,9 +3315,13 @@ class MainApp(main.main):
 
                                 if isInconsistent:
                                     inconsistentReads.append(cOffset)
+
                                 tempFile.write(data)
                                 spareBuf += spare
                                 bbBuf += bbm
+
+                                if self.nand_format == 1:
+                                    tempFile.write(spare)
 
                                 cOffset += (
                                     (0x800 if NANDC._page_size == 1 else 0x200)
@@ -3281,7 +3336,14 @@ class MainApp(main.main):
                             else:
                                 raise NotImplementedError()
 
-                            self._progMsgQueue.put(cOffset / eOffset)
+                            readTimeEnd = time.perf_counter()
+
+                            read_times.append(readTimeEnd-readTimeStart)
+                            if len(read_times) > 50:
+                                read_times.pop(0)
+
+                            self._progMsgQueue.put(
+                                [cOffset / eOffset, f"Read {hex(cOffset)} of {hex(eOffset)}, average time of last 50 commands: {round(sum(read_times)/len(read_times), 4)}"])
 
                         if len(inconsistentReads) >= 1:
                             self._logThreadQueue.put(
@@ -3290,6 +3352,7 @@ class MainApp(main.main):
 
                     elif self.identical_check_mode == 1:
                         tempFilesHash = []
+                        if self.nand_mode == 1: raise Exception("Check for identical reads by reading the entire flash option doesn't work on interleaved NAND format.")
 
                         for c in range(self.max_read_pass):
                             if self._isReadCanceled:
@@ -3303,6 +3366,8 @@ class MainApp(main.main):
                                 prefix="dumpit_", suffix=".bin"
                             ) as tempFileTemp:
                                 while cOffset < eOffset and not self._isReadCanceled:
+                                    readTimeStart = time.perf_counter()
+
                                     if self._loaded_dcc is not None or selPlat[
                                         "mode"
                                     ] in [-1, 4]:
@@ -3356,7 +3421,15 @@ class MainApp(main.main):
                                     else:
                                         raise NotImplementedError()
 
-                                    self._progMsgQueue.put(cOffset / eOffset)
+                                    readTimeEnd = time.perf_counter()
+
+                                    read_times.append(
+                                        readTimeEnd-readTimeStart)
+                                    if len(read_times) > 50:
+                                        read_times.pop(0)
+
+                                    self._progMsgQueue.put(
+                                        [cOffset / eOffset, f"Read {hex(cOffset)} of {hex(eOffset)}, average time of last 50 commands: {round(sum(read_times)/len(read_times), 4)}"])
 
                                 if self._isReadCanceled:
                                     break
@@ -3392,15 +3465,23 @@ class MainApp(main.main):
                                         tempFile.write(
                                             tempFileTemp.read(0x8000))
 
-                spare_start_offset = tempFile.tell()
-                tempFile.write(spareBuf)
-                bbm_start_offset = tempFile.tell()
-                tempFile.write(bbBuf)
+                if self.nand_format == 0: 
+                    spare_start_offset = tempFile.tell()
+                    tempFile.write(spareBuf)
+
+                    if not self.metadata["ignore_metadata"]:
+                        bbm_start_offset = tempFile.tell()
+                        tempFile.write(bbBuf)
+
+                elif self.nand_format == 2:
+                    open(f'{os.path.splitext(name)[0]}_spare{os.path.splitext(name)[1]}', "wb").write(spareBuf)
+                    open(f'{os.path.splitext(name)[0]}_additional{os.path.splitext(name)[1]}', "wb").write(bbBuf)
+
                 self._logThreadQueue.put(
                     f"Dump flash finished {datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')}"
                 )
 
-                if not self.metadata["ignore_metadata"]:
+                if not self.metadata["ignore_metadata"] and self.nand_format == 0:
                     tempFile.write(
                         self._generateMetadata(
                             [
@@ -3954,6 +4035,9 @@ class MainApp(main.main):
             cfg["nand_page_width"] = self.page_width
 
             cfg["nand_init_code"] = self.nand_init_code
+            cfg["msm6550_discrepancy"] = self.msm6550_discrepancy
+            cfg["nand_out_format"] = self.nand_format
+            cfg["use_fast_api"] = self.fast_api
 
             cfg["read_size"] = self.nor_read_size
             cfg["max_read_pass"] = self.max_read_pass
@@ -4105,12 +4189,12 @@ def getInitCmd(self: MainApp):
 
     t = -1
     isBig = False
-    
+
     targets = []
     endianTargets = []
 
     if self.cTarget.Selection >= 1:
-        t = self.cTarget.Selection        
+        t = self.cTarget.Selection
 
         if t >= self._beTarget:
             isBig = True
@@ -4118,28 +4202,30 @@ def getInitCmd(self: MainApp):
 
         else:
             t -= 1
-            
+
         targets.append(t)
         endianTargets.append(isBig)
-            
+
     elif "platform" in const._platforms[self.cChipset.Selection]:
         if isinstance(const._platforms[self.cChipset.Selection]["platform"], str):
-            isBig = const._platforms[self.cChipset.Selection]["platform"].endswith("-be")
-            t = const._targets.index(const._platforms[self.cChipset.Selection]["platform"].rstrip("-be"))
-            
+            isBig = const._platforms[self.cChipset.Selection]["platform"].endswith(
+                "-be")
+            t = const._targets.index(
+                const._platforms[self.cChipset.Selection]["platform"].rstrip("-be"))
+
             targets.append(t)
             endianTargets.append(isBig)
-            
+
         else:
             for p in const._platforms[self.cChipset.Selection]["platform"]:
                 isBig = p.endswith("-be")
                 t = const._targets.index(p.rstrip("-be"))
-            
+
                 targets.append(t)
                 endianTargets.append(isBig)
-            
-        
-    if len(targets) <= 0: raise Exception("You must manually specify the target")
+
+    if len(targets) <= 0:
+        raise Exception("You must manually specify the target")
 
     for k, t in enumerate(targets):
         fixedIR = 0

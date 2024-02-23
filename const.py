@@ -1,4 +1,4 @@
-DUMPIT_VERSION = "0.925"
+DUMPIT_VERSION = "0.926"
 
 _interfaces = [
     (
@@ -174,38 +174,25 @@ _platforms_a = [
         "init": [],
     },
     {
-        "name": "MSM5100/MSM5500/MSM6000",
+        "name": "MSM5100/MSM5500/MSM6000 (4MB)",
         "platform": "arm7tdmi",
         "mode": 4,
         "chip_width": 2,
         "bus_width": 2,
-        "init": [
-            {"address": "03000674", "type": 2, "value": "0x00000002"},
-            {"address": "03000664", "type": 2, "value": "0x00000002"},
-            {"address": "03000660", "type": 2, "value": "0x00000800"},
-            {"address": "03000670", "type": 2, "value": "0x00004800"},
-            {"address": "03000720", "type": 2, "value": "0x00000E00"},
-            {"address": "0300072C", "type": 2, "value": "0x00000E00"},
-            {"address": "048000A4", "type": 2, "value": "0x00000001"},
-            {"address": "04800070", "type": 2, "value": "0x00000004"},
-            {"address": "0480008C", "type": 2, "value": "0x00000000"},
+        "init": [            
+            {"address": "04800080", "type": 2, "value": "0x00001033"},
+            {"address": "048000A0", "type": 2, "value": "0x00000002"},
+        ],
+    },
+    {
+        "name": "MSM5100/MSM5500/MSM6000 (8MB)",
+        "platform": "arm7tdmi",
+        "mode": 4,
+        "chip_width": 2,
+        "bus_width": 2,
+        "init": [            
             {"address": "04800080", "type": 2, "value": "0x00002033"},
-            {"address": "03000674", "type": 2, "value": "0x00000002"},
-            {"address": "03000664", "type": 2, "value": "0x00000002"},
-            {"address": "04800080", "type": 4, "value": "0x00002033"},
-            {"address": "04800084", "type": 4, "value": "0x00000433"},
-            {"address": "04800088", "type": 4, "value": "0x00000421"},
-            {"address": "0480008C", "type": 4, "value": "0x00000000"},
-            {"address": "04800090", "type": 4, "value": "0x00001603"},
-            {"address": "04800094", "type": 4, "value": "0x00000000"},
-            {"address": "04800098", "type": 4, "value": "0x00000000"},
-            {"address": "048000A0", "type": 4, "value": "0x00000007"},
-            {"address": "04800000", "type": 4, "value": "0x00000004"},
-            {"address": "04800004", "type": 4, "value": "0x00000000"},
-            {"address": "0480009C", "type": 4, "value": "0x00000513"},
-            {"address": "03000760", "type": 4, "value": "0x00000000"},
-            {"address": "03000768", "type": 4, "value": "0x00000000"},
-            {"address": "03000738", "type": 4, "value": "0x00000010"},
+            {"address": "048000A0", "type": 2, "value": "0x00000006"},
         ],
     },
     {

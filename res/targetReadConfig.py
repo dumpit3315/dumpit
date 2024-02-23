@@ -17,7 +17,7 @@ import wx.xrc
 class TargetReadConfig ( wx.Dialog ):
 
 	def __init__( self, parent ):
-		wx.Dialog.__init__ ( self, parent, id = wx.ID_ANY, title = wx.EmptyString, pos = wx.DefaultPosition, size = wx.Size( 500,275 ), style = wx.DEFAULT_DIALOG_STYLE )
+		wx.Dialog.__init__ ( self, parent, id = wx.ID_ANY, title = wx.EmptyString, pos = wx.DefaultPosition, size = wx.Size( 500,320 ), style = wx.DEFAULT_DIALOG_STYLE )
 
 		self.SetSizeHints( wx.DefaultSize, wx.DefaultSize )
 
@@ -90,6 +90,21 @@ class TargetReadConfig ( wx.Dialog ):
 
 
 		bSizer91.Add( bSizer92111, 0, wx.EXPAND, 5 )
+
+		bSizer921111 = wx.BoxSizer( wx.HORIZONTAL )
+
+		self.lOutFormat = wx.StaticText( self, wx.ID_ANY, u"Output Format:", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.lOutFormat.Wrap( -1 )
+
+		bSizer921111.Add( self.lOutFormat, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+		cOutFormatChoices = [ u"Spare after the last NAND page", u"Page/Spare Interleaved", u"Spare on seperate file", u"Page only" ]
+		self.cOutFormat = wx.Choice( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, cOutFormatChoices, 0 )
+		self.cOutFormat.SetSelection( 0 )
+		bSizer921111.Add( self.cOutFormat, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+
+		bSizer91.Add( bSizer921111, 0, wx.EXPAND, 5 )
 
 
 		bSizer89.Add( bSizer91, 1, wx.EXPAND, 5 )

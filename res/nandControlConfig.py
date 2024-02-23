@@ -17,7 +17,7 @@ import wx.xrc
 class NANDControllerConfig ( wx.Dialog ):
 
 	def __init__( self, parent ):
-		wx.Dialog.__init__ ( self, parent, id = wx.ID_ANY, title = wx.EmptyString, pos = wx.DefaultPosition, size = wx.Size( 410,240 ), style = wx.DEFAULT_DIALOG_STYLE )
+		wx.Dialog.__init__ ( self, parent, id = wx.ID_ANY, title = wx.EmptyString, pos = wx.DefaultPosition, size = wx.Size( 410,280 ), style = wx.DEFAULT_DIALOG_STYLE )
 
 		self.SetSizeHints( wx.DefaultSize, wx.DefaultSize )
 
@@ -56,7 +56,23 @@ class NANDControllerConfig ( wx.Dialog ):
 		bSizer6911.Add( self.bSkipGPIOInit, 1, wx.ALL, 5 )
 
 
-		bSizer70.Add( bSizer6911, 1, wx.EXPAND, 5 )
+		bSizer70.Add( bSizer6911, 0, wx.EXPAND, 5 )
+
+		bSizer69112 = wx.BoxSizer( wx.HORIZONTAL )
+
+		self.bDisableMSM6550Quirks = wx.CheckBox( self, wx.ID_ANY, u"Disable MSM6550 Quirks", wx.DefaultPosition, wx.DefaultSize, wx.ALIGN_RIGHT )
+		bSizer69112.Add( self.bDisableMSM6550Quirks, 1, wx.ALL, 5 )
+
+
+		bSizer70.Add( bSizer69112, 0, wx.EXPAND, 5 )
+
+		bSizer69113 = wx.BoxSizer( wx.HORIZONTAL )
+
+		self.bUseFastAPI = wx.CheckBox( self, wx.ID_ANY, u"Use OpenOCD NAND API", wx.DefaultPosition, wx.DefaultSize, wx.ALIGN_RIGHT )
+		bSizer69113.Add( self.bUseFastAPI, 1, wx.ALL, 5 )
+
+
+		bSizer70.Add( bSizer69113, 0, wx.EXPAND, 5 )
 
 
 		bSizer68.Add( bSizer70, 1, 0, 5 )
