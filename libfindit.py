@@ -269,7 +269,9 @@ def _msleep(dur: int):
 def _pulse_tck(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseController], tck: int):
     dev.write(dev.read() & ~(1 << tck))
     _msleep(DELAY)
+
     dev.write(dev.read() | (1 << tck))
+    _msleep(DELAY)
 
 
 def _pulse_tdi(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseController], tck: int, tdi: int, value: int):
@@ -283,6 +285,7 @@ def _pulse_tdi(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseControl
         dev.write(dev.read() & ~(1 << tdi))
 
     dev.write(dev.read() | (1 << tck))
+    _msleep(DELAY)
 
 
 def _pulse_tdi_rising(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseController], tck: int, tdi: int, value: int):
@@ -294,14 +297,19 @@ def _pulse_tdi_rising(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsse
 
     dev.write(dev.read() | (1 << tck))
     _msleep(DELAY)
+
     dev.write(dev.read() & ~(1 << tck))
+    _msleep(DELAY)
 
 
 def _pulse_tdo(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseController], tck: int, tdo: int):
     dev.write(dev.read() & ~(1 << tck))
     _msleep(DELAY)
+
     temp = (dev.read() >> tdo) & 1
+
     dev.write(dev.read() | (1 << tck))
+    _msleep(DELAY)
     return temp
 
 
@@ -318,6 +326,7 @@ def _write_tap(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseControl
             dev.write(dev.read() & ~(1 << tms))
 
         dev.write(dev.read() | (1 << tck))
+        _msleep(DELAY)
 
 
 def _do_write_read(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseController], tck: int, tdi: int, tdo: int, value: int):
@@ -325,9 +334,10 @@ def _do_write_read(dev: typing.Union[gpio.GpioAsyncController, gpio.GpioMpsseCon
 
     # Lower TCK for rising edge pulse first
     dev.write(dev.read() & ~(1 << tck))
+    _msleep(DELAY)
+
     for i in range(32):
-        _pulse_tdi_rising(dev, tck, tdi, (value >> i) & 1)
-        _msleep(DELAY)
+        _pulse_tdi_rising(dev, tck, tdi, (value >> i) & 1)        
 
         if dev.read() & (1 << tdo):
             temp |= (1 << i)
@@ -400,8 +410,7 @@ def find_jtag_idcode(src: str, dummy: bool = False, mpsse: bool = False, max: in
                     idcodes.append(0)
                     for s in range(32):
                         # Low, outputs TDO, High shifts the content
-                        _pulse_tck(inDevice, tck)
-                        _msleep(DELAY)
+                        _pulse_tck(inDevice, tck)                        
 
                         if inDevice.read() & (1 << tdo):
                             idcodes[x] |= 1 << s
@@ -430,8 +439,7 @@ def find_jtag_idcode(src: str, dummy: bool = False, mpsse: bool = False, max: in
 
                         new_idcode = 0
                         for s in range(32):
-                            _pulse_tck(inDevice, tck)
-                            _msleep(DELAY)
+                            _pulse_tck(inDevice, tck)                            
 
                             if inDevice.read() & (1 << tdo):
                                 new_idcode |= 1 << s
@@ -491,8 +499,7 @@ def find_jtag_bypass(src: str, dummy: bool = False, mpsse: bool = False, max: in
 
                     for _ in range(MAX_DEVICES):
                         _pulse_tdi(inDevice, tck, tdi, 1)
-
-                    _msleep(DELAY)
+                    
                     inDevice.write(inDevice.read() & ~(1 << tdi))
 
                     devices = 0
@@ -543,8 +550,7 @@ def find_jtag_bypass(src: str, dummy: bool = False, mpsse: bool = False, max: in
 
                             for _ in range(MAX_DEVICES):
                                 _pulse_tdi(inDevice, tck, tdi, 1)
-
-                            _msleep(DELAY)
+                            
                             inDevice.write(inDevice.read() & ~(1 << tdi))
 
                             devices_2 = 0
@@ -649,8 +655,7 @@ if _GPIOD_SUPPORT:
                             for x in range(MAX_DEVICES):
                                 idcodes.append(0)
                                 for s in range(32):
-                                    _pulse_tck_gpiod(line, tck)
-                                    _msleep(DELAY)
+                                    _pulse_tck_gpiod(line, tck)                                    
 
                                     idcodes[x] |= line.get_value(tdo) << s
 
@@ -687,8 +692,7 @@ if _GPIOD_SUPPORT:
 
                                     new_idcode = 0
                                     for s in range(32):
-                                        _pulse_tck_gpiod(line, tck)
-                                        _msleep(DELAY)
+                                        _pulse_tck_gpiod(line, tck)                                        
 
                                         new_idcode |= line.get_value(tdo) << s
 
@@ -744,8 +748,7 @@ if _GPIOD_SUPPORT:
 
                         for _ in range(MAX_DEVICES):
                             _pulse_tdi(inDevice, tck, tdi, 1)
-
-                        _msleep(DELAY)
+                        
                         inDevice.write(inDevice.read() & ~(1 << tdi))
 
                         devices = 0
@@ -798,8 +801,7 @@ if _GPIOD_SUPPORT:
 
                                 for _ in range(MAX_DEVICES):
                                     _pulse_tdi(inDevice, tck, tdi, 1)
-
-                                _msleep(DELAY)
+                                
                                 inDevice.write(inDevice.read() & ~(1 << tdi))
 
                                 devices_2 = 0
@@ -846,9 +848,7 @@ if _GPIOD_SUPPORT:
 
                         for _ in range(30):
                             rtck_bit = 1 if not rtck_bit else 0
-                            line.set_value(tck, rtck_bit)
-
-                            _msleep(DELAY)
+                            line.set_value(tck, rtck_bit)                            
 
                             if line.get_value(rtck) == rtck_bit:
                                 rtck_match += 1
