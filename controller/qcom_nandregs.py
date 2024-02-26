@@ -359,6 +359,28 @@ class MSM6800NANDController(_BaseQCOMNANDController):
         while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
             pass #time.sleep(0.05)
 
+        if get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_DONE) != 0 or force_autoprobe:
+            self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_COMMON_CFG.value,
+                            1 << MSM6800_NANDCOMMONCFG_BITS_MASK.NAND_AUTOPROBE.value[0])
+            self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD.value,
+                            MSM6250_6800_NANDOPS.PAGE_READ.value)
+
+            while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
+                pass #time.sleep(0.05)
+
+            self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_COMMON_CFG.value,
+                            self._prev_common_cfg)
+
+        if self._page_size == -1:
+            self._page_size = get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value,
+                                      MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_ISLARGE)
+
+        self._page_width = get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value,
+                                   MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_IS16BIT)        
+
+        set_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_CFG1_FLASH1.value, MSM6800_NANDCFG1_BITS_MASK.PAGE_IS_2KB, self._page_size)
+        set_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_CFG1_FLASH1.value, MSM6800_NANDCFG1_BITS_MASK.WIDE_NAND, self._page_width)        
+
         self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD.value,
                         MSM6250_6800_NANDOPS.ID_FETCH.value)
 
@@ -372,32 +394,12 @@ class MSM6800NANDController(_BaseQCOMNANDController):
             pass #time.sleep(0.05)
 
         self._idcode = (get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_ID_DATA.value, MSM6800_NANDFLASHID_BITS_MASK.NAND_MFRID) << 24) | (get_bit(self, self._nfi_base +
-                                                                                                                                                         MSM6800_NANDREGS.FLASH_ID_DATA.value, MSM6800_NANDFLASHID_BITS_MASK.NAND_DEVID) << 16) | get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_ID_DATA.value, MSM6800_NANDFLASHID_BITS_MASK.NAND_EXTID)
-        if get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_DONE) != 0 or force_autoprobe:
-            self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_COMMON_CFG.value,
-                            1 << MSM6800_NANDCOMMONCFG_BITS_MASK.NAND_AUTOPROBE.value[0])
-            self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD.value,
-                            MSM6250_6800_NANDOPS.PAGE_READ.value)
-
-            while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
-                pass #time.sleep(0.05)
-
-        if self._page_size == -1:
-            self._page_size = get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value,
-                                      MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_ISLARGE)
-
-        self._page_width = get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value,
-                                   MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_IS16BIT)
-
+                                                                                                                                                         MSM6800_NANDREGS.FLASH_ID_DATA.value, MSM6800_NANDFLASHID_BITS_MASK.NAND_DEVID) << 16) | get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_ID_DATA.value, MSM6800_NANDFLASHID_BITS_MASK.NAND_EXTID)        
         self._set_common_cfg = custom_common_cfg if custom_common_cfg != -1 else 0x3
         self._set_cfg2 = custom_cfg2 if custom_cfg2 != -1 else 0x4219442
         self._set_cfg1 = custom_cfg1 if custom_cfg1 != -1 else (0xa | (self._page_size << MSM6800_NANDCFG1_BITS_MASK.PAGE_IS_2KB.value[0]) | (
-            self._page_width << MSM6800_NANDCFG1_BITS_MASK.WIDE_NAND.value[0]) | (get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_DONE) << 31))
-
-        if self._skip_reg_init:
-            self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_COMMON_CFG.value,
-                            self._prev_common_cfg)
-
+            self._page_width << MSM6800_NANDCFG1_BITS_MASK.WIDE_NAND.value[0]))
+        
         self._reset_first = False
 
     def read(self, page: int):
