@@ -176,19 +176,19 @@ class MSM6250NANDController(_BaseQCOMNANDController):
                         MSM6250_6800_NANDOPS.RESET_NAND.value)
 
         while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS.value, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
-            pass #time.sleep(0.05)
+            pass  # time.sleep(0.05)
 
         self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CMD.value,
                         MSM6250_6800_NANDOPS.ID_FETCH.value)
 
         while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS.value, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
-            pass #time.sleep(0.05)
+            pass  # time.sleep(0.05)
 
         self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CMD.value,
                         MSM6250_6800_NANDOPS.STATUS_CHECK.value)
 
         while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS.value, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
-            pass #time.sleep(0.05)
+            pass  # time.sleep(0.05)
 
         self._idcode = (get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS.value, MSM6250_NANDSTATUS_BITS_MASK.NAND_MFRID)
                         << 24) | (get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS.value, MSM6250_NANDSTATUS_BITS_MASK.NAND_DEVID) << 16)
@@ -204,13 +204,13 @@ class MSM6250NANDController(_BaseQCOMNANDController):
                                 MSM6250_6800_NANDOPS.RESET.value)
 
                 while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS.value, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
-                    pass #time.sleep(0.05)
+                    pass  # time.sleep(0.05)
 
             self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CMD.value,
                             MSM6250_6800_NANDOPS.RESET_NAND.value)
 
             while get_bit(self, self._nfi_base + MSM6250_NANDREGS.FLASH_STATUS.value, MSM6250_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
-                pass #time.sleep(0.05)
+                pass  # time.sleep(0.05)
 
             if not self._skip_reg_init:
                 self._cmd_write(self._nfi_base + MSM6250_NANDREGS.FLASH_CFG1.value,
@@ -357,7 +357,7 @@ class MSM6800NANDController(_BaseQCOMNANDController):
                         MSM6250_6800_NANDOPS.RESET_NAND.value)
 
         while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
-            pass #time.sleep(0.05)
+            pass  # time.sleep(0.05)
 
         if get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_DONE) != 0 or force_autoprobe:
             self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_COMMON_CFG.value,
@@ -366,7 +366,7 @@ class MSM6800NANDController(_BaseQCOMNANDController):
                             MSM6250_6800_NANDOPS.PAGE_READ.value)
 
             while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
-                pass #time.sleep(0.05)
+                pass  # time.sleep(0.05)
 
             self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_COMMON_CFG.value,
                             self._prev_common_cfg)
@@ -376,30 +376,32 @@ class MSM6800NANDController(_BaseQCOMNANDController):
                                       MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_ISLARGE)
 
         self._page_width = get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value,
-                                   MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_IS16BIT)        
+                                   MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_IS16BIT)
 
-        set_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_CFG1_FLASH1.value, MSM6800_NANDCFG1_BITS_MASK.PAGE_IS_2KB, self._page_size)
-        set_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_CFG1_FLASH1.value, MSM6800_NANDCFG1_BITS_MASK.WIDE_NAND, self._page_width)        
+        set_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_CFG1_FLASH1.value,
+                MSM6800_NANDCFG1_BITS_MASK.PAGE_IS_2KB, self._page_size)
+        set_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_CFG1_FLASH1.value,
+                MSM6800_NANDCFG1_BITS_MASK.WIDE_NAND, self._page_width)
 
         self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD.value,
                         MSM6250_6800_NANDOPS.ID_FETCH.value)
 
         while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
-            pass #time.sleep(0.05)
+            pass  # time.sleep(0.05)
 
         self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD.value,
                         MSM6250_6800_NANDOPS.STATUS_CHECK.value)
 
         while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
-            pass #time.sleep(0.05)
+            pass  # time.sleep(0.05)
 
         self._idcode = (get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_ID_DATA.value, MSM6800_NANDFLASHID_BITS_MASK.NAND_MFRID) << 24) | (get_bit(self, self._nfi_base +
-                                                                                                                                                         MSM6800_NANDREGS.FLASH_ID_DATA.value, MSM6800_NANDFLASHID_BITS_MASK.NAND_DEVID) << 16) | get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_ID_DATA.value, MSM6800_NANDFLASHID_BITS_MASK.NAND_EXTID)        
+                                                                                                                                                         MSM6800_NANDREGS.FLASH_ID_DATA.value, MSM6800_NANDFLASHID_BITS_MASK.NAND_DEVID) << 16) | get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_ID_DATA.value, MSM6800_NANDFLASHID_BITS_MASK.NAND_EXTID)
         self._set_common_cfg = custom_common_cfg if custom_common_cfg != -1 else 0x3
         self._set_cfg2 = custom_cfg2 if custom_cfg2 != -1 else 0x4219442
         self._set_cfg1 = custom_cfg1 if custom_cfg1 != -1 else (0xa | (self._page_size << MSM6800_NANDCFG1_BITS_MASK.PAGE_IS_2KB.value[0]) | (
             self._page_width << MSM6800_NANDCFG1_BITS_MASK.WIDE_NAND.value[0]))
-        
+
         self._reset_first = False
 
     def read(self, page: int):
@@ -410,13 +412,13 @@ class MSM6800NANDController(_BaseQCOMNANDController):
                                 MSM6250_6800_NANDOPS.RESET.value)
 
                 while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
-                    pass #time.sleep(0.05)
+                    pass  # time.sleep(0.05)
 
             self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD.value,
                             MSM6250_6800_NANDOPS.RESET_NAND.value)
 
             while get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.OP_STATUS) != 0:
-                pass #time.sleep(0.05)
+                pass  # time.sleep(0.05)
 
             if not self._skip_reg_init:
                 self._cmd_write(
@@ -725,7 +727,8 @@ class MSM7200NANDController(_BaseQCOMNANDController):
 
             tempbuf += temp_mem[:0x200]
             tempbuf_spare += temp_mem[0x200:]
-            tempbuf_bbm += (self._cmd_read(self._nfi_base + MSM7200_NANDREGS.BUFFER_STATUS.value) >> 16).to_bytes(2, "little")
+            tempbuf_bbm += (self._cmd_read(self._nfi_base +
+                            MSM7200_NANDREGS.BUFFER_STATUS.value) >> 16).to_bytes(2, "little")
 
         return bytes(tempbuf), bytes(tempbuf_spare), bytes(tempbuf_bbm)
 
@@ -783,7 +786,7 @@ class MSM7200OneNANDController(_BaseQCOMNANDController):
 
         self._regwrite(O1N_REGS.REG_COMMAND, O1N_NANDOPS.HOT_RESET.value)
         while (self._regread(O1N_REGS.REG_INTERRUPT) & 0x8000) != 0x8000 and not _DEBUG_CONTROLLER:
-            pass #time.sleep(0.1)
+            pass  # time.sleep(0.1)
 
         self._idcode = (self._regread(O1N_REGS.REG_MANUFACTURER_ID)
                         << 24) | (self._regread(O1N_REGS.REG_DEVICE_ID) << 16)
