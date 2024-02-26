@@ -361,7 +361,7 @@ class MSM6800NANDController(_BaseQCOMNANDController):
 
         if get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_STATUS.value, MSM6800_NANDSTATUS_BITS_MASK.NAND_AUTOPROBE_DONE) != 0 or force_autoprobe:
             self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_COMMON_CFG.value,
-                            1 << MSM6800_NANDCOMMONCFG_BITS_MASK.NAND_AUTOPROBE.value[0])
+                            (1 << MSM6800_NANDCOMMONCFG_BITS_MASK.NAND_AUTOPROBE.value[0]) | (self._device_id << MSM6800_NANDCOMMONCFG_BITS_MASK.NAND_SEL.value[0]))
             self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD.value,
                             MSM6250_6800_NANDOPS.PAGE_READ.value)
 
@@ -383,6 +383,9 @@ class MSM6800NANDController(_BaseQCOMNANDController):
         set_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_CFG1_FLASH1.value,
                 MSM6800_NANDCFG1_BITS_MASK.WIDE_NAND, self._page_width)
 
+        set_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_COMMON_CFG.value,
+                MSM6800_NANDCOMMONCFG_BITS_MASK.NAND_SEL, self._device_id)
+
         self._cmd_write(self._nfi_base + MSM6800_NANDREGS.FLASH_CMD.value,
                         MSM6250_6800_NANDOPS.ID_FETCH.value)
 
@@ -397,7 +400,8 @@ class MSM6800NANDController(_BaseQCOMNANDController):
 
         self._idcode = (get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_ID_DATA.value, MSM6800_NANDFLASHID_BITS_MASK.NAND_MFRID) << 24) | (get_bit(self, self._nfi_base +
                                                                                                                                                          MSM6800_NANDREGS.FLASH_ID_DATA.value, MSM6800_NANDFLASHID_BITS_MASK.NAND_DEVID) << 16) | get_bit(self, self._nfi_base + MSM6800_NANDREGS.FLASH_ID_DATA.value, MSM6800_NANDFLASHID_BITS_MASK.NAND_EXTID)
-        self._set_common_cfg = custom_common_cfg if custom_common_cfg != -1 else 0x3
+        self._set_common_cfg = custom_common_cfg if custom_common_cfg != - \
+            1 else (0x3 | (self._device_id << MSM6800_NANDCOMMONCFG_BITS_MASK.NAND_SEL.value[0]))
         self._set_cfg2 = custom_cfg2 if custom_cfg2 != -1 else 0x4219442
         self._set_cfg1 = custom_cfg1 if custom_cfg1 != -1 else (0xa | (self._page_size << MSM6800_NANDCFG1_BITS_MASK.PAGE_IS_2KB.value[0]) | (
             self._page_width << MSM6800_NANDCFG1_BITS_MASK.WIDE_NAND.value[0]))
@@ -597,7 +601,7 @@ class MSM7200NANDController(_BaseQCOMNANDController):
             self._cmd_write(self._nfi_base +
                             MSM7200_NANDREGS.DEV_CMD6.value, 0x40e0)
             self._cmd_write(self._nfi_base +
-                            MSM7200_NANDREGS.FLASH_CHIP_SELECT.value, devid)
+                            MSM7200_NANDREGS.FLASH_CHIP_SELECT.value, self._device_id)
 
         self._send_cmd(MSM7200_NANDOPS.RESET.value)
         self._send_cmd(MSM7200_NANDOPS.RESET_NAND.value)
