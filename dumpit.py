@@ -2384,7 +2384,7 @@ class MainApp(main.main):
                         raise Exception("Flash probe failed!")
                     self._ocdSendCommand("flash info 0")
 
-                elif selPlat["mode"] == 12 and (self.fast_api and selPlat["mode"] in [1, 2, 3, 5, 9]):
+                elif selPlat["mode"] == 12 or (self.fast_api and selPlat["mode"] in [1, 2, 3, 5, 9]):
                     if selPlat["mode"] == 1:
                         self._ocdSendCommand(
                             f"msm6250 base_addr 0 {hex(selPlat['flash_regs'])}")
@@ -3296,7 +3296,7 @@ class MainApp(main.main):
                             )
                             cOffset += min(CFI_READ_BUFFER, eOffset - cOffset)
 
-                        elif (self.fast_api and selPlat["mode"] in [1, 2, 3, 5, 9]):
+                        elif (self.fast_api and selPlat["mode"] in [1, 2, 3, 5, 9, 12]):
                             data, spare = self.cmd_read_nand(
                                 page_mode, cOffset, 16)
                             cOffset += (0x800 if page_mode ==
@@ -3382,7 +3382,7 @@ class MainApp(main.main):
                                 cOffset += min(CFI_READ_BUFFER,
                                                eOffset - cOffset)
 
-                            elif (self.fast_api and selPlat["mode"] in [1, 2, 3, 5, 9]):
+                            elif (self.fast_api and selPlat["mode"] in [1, 2, 3, 5, 9, 12]):
                                 for _ in range(self.max_read_pass):
                                     data, spare = self.cmd_read_nand(
                                         page_mode, cOffset, 16)
@@ -3510,7 +3510,7 @@ class MainApp(main.main):
                                             CFI_READ_BUFFER, eOffset - cOffset
                                         )
 
-                                    elif (self.fast_api and selPlat["mode"] in [1, 2, 3, 5, 9]):
+                                    elif (self.fast_api and selPlat["mode"] in [1, 2, 3, 5, 9, 12]):
                                         data, spare = self.cmd_read_nand(
                                             page_mode, cOffset, 16)
                                         cOffset += (0x800 if page_mode ==
