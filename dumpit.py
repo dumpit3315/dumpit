@@ -2445,10 +2445,14 @@ class MainApp(main.main):
                         self._ocdSendCommand(
                             f"nand_generic cle 0 {selPlat['flash_cmd']}")
 
-                        self._ocdSendCommand(
-                            f"nand_generic rb 0 {selPlat['flash_wait']}")
-                        self._ocdSendCommand(
-                            f"nand_generic rb_mask 0 {selPlat['wait_mask']}")
+                        if selPlat['flash_wait'] is not None:
+                            self._ocdSendCommand(
+                                f"nand_generic rb 0 {selPlat['flash_wait']}")
+                            self._ocdSendCommand(
+                                f"nand_generic rb_mask 0 {selPlat['wait_mask']}")
+                        else:
+                            self._ocdSendCommand(
+                                f"nand_generic rb 0 {selPlat['flash_buffer']}")
 
                         self._ocdSendCommand(
                             f"nand_generic re 0 {selPlat['flash_buffer']}")
@@ -2501,10 +2505,16 @@ class MainApp(main.main):
                             f"nand_generic cle 0 {selPlat['flash_cmd']}")
                         self._ocdSendCommand(
                             f"nand_generic cle_mask 0 {selPlat['cle_mask']}")
-                        self._ocdSendCommand(
-                            f"nand_generic rb 0 {selPlat['flash_wait']}")
-                        self._ocdSendCommand(
-                            f"nand_generic rb_mask 0 {selPlat['wait_mask']}")
+                        
+                        if selPlat['flash_wait'] is not None:
+                            self._ocdSendCommand(
+                                f"nand_generic rb 0 {selPlat['flash_wait']}")
+                            self._ocdSendCommand(
+                                f"nand_generic rb_mask 0 {selPlat['wait_mask']}")
+                        else:
+                            self._ocdSendCommand(
+                                f"nand_generic rb 0 {selPlat['flash_buffer']}")
+                            
                         self._ocdSendCommand(
                             f"nand_generic re 0 {selPlat['flash_buffer']}")
 
