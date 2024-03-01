@@ -52,7 +52,7 @@ class main ( wx.Frame ):
 
 		bSizer6.Add( self.lSpeed, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
-		self.nSpeed = wx.SpinCtrl( self.dPage1, wx.ID_ANY, u"1000", wx.DefaultPosition, wx.DefaultSize, wx.SP_ARROW_KEYS|wx.TE_PROCESS_ENTER, 0, 30000, 1000 )
+		self.nSpeed = wx.SpinCtrl( self.dPage1, wx.ID_ANY, u"4000", wx.DefaultPosition, wx.DefaultSize, wx.SP_ARROW_KEYS|wx.TE_PROCESS_ENTER, 0, 30000, 4000 )
 		bSizer6.Add( self.nSpeed, 1, wx.ALL, 5 )
 
 		self.bConfigureRead = wx.Button( self.dPage1, wx.ID_ANY, u"Target Read Settings", wx.DefaultPosition, wx.DefaultSize, 0 )

@@ -74,6 +74,14 @@ class NANDControllerConfig ( wx.Dialog ):
 
 		bSizer70.Add( bSizer69113, 0, wx.EXPAND, 5 )
 
+		bSizer691131 = wx.BoxSizer( wx.HORIZONTAL )
+
+		self.bSelect2ndBank = wx.CheckBox( self, wx.ID_ANY, u"Select 2nd Bank", wx.DefaultPosition, wx.DefaultSize, wx.ALIGN_RIGHT )
+		bSizer691131.Add( self.bSelect2ndBank, 1, wx.ALL, 5 )
+
+
+		bSizer70.Add( bSizer691131, 1, wx.EXPAND, 5 )
+
 
 		bSizer68.Add( bSizer70, 1, 0, 5 )
 

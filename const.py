@@ -1,4 +1,4 @@
-DUMPIT_VERSION = "0.926"
+DUMPIT_VERSION = "0.95"
 
 _interfaces = [
     (
@@ -682,6 +682,12 @@ _platforms_b = _platforms_b = [
         "mode": 8,
         "init": [],
     },
+    {
+        "name": "PXA3xx",
+        "platform": "xscale",
+        "mode": 11,
+        "init": [],
+    },
 ]
 
 # 0xf9800000
@@ -726,6 +732,41 @@ _platforms_c = [
                 "value": "0x0",
             }
         ]
+    },
+    {
+        "name": "s3c2410",
+        "mode": 12,
+        "controller": "s3c2410",
+        "controller_args": "",
+        "init": [],
+    },
+    {
+        "name": "s3c2412",
+        "mode": 12,
+        "controller": "s3c2412",
+        "controller_args": "",
+        "init": [],
+    },
+    {
+        "name": "s3c2440",
+        "mode": 12,
+        "controller": "s3c2440",
+        "controller_args": "",
+        "init": [],
+    },
+    {
+        "name": "s3c2443",
+        "mode": 12,
+        "controller": "s3c2443",
+        "controller_args": "",
+        "init": [],
+    },
+    {
+        "name": "s3c6400",
+        "mode": 12,
+        "controller": "s3c6400",
+        "controller_args": "",
+        "init": [],
     },
     {"name": "NULL", "mode": -1, "init": []},
 ]
