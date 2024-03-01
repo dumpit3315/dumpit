@@ -2391,7 +2391,7 @@ class MainApp(main.main):
                         self._ocdSendCommand(
                             f"msm6250 int_addr 0 {hex(selPlat['flash_int'])}")
                         self._ocdSendCommand(
-                            f"msm6250 int_cle_addr 0 {hex(selPlat['flash_int_clear'])}")
+                            f"msm6250 int_clr_addr 0 {hex(selPlat['flash_int_clear'])}")
                         self._ocdSendCommand(
                             f"msm6250 msm6550_discrepancy 0 {int(False if not self.msm6550_discrepancy else selPlat['flash_has_header'])}")
                         self._ocdSendCommand(
@@ -2539,7 +2539,7 @@ class MainApp(main.main):
                             self._ocdSendCommand(
                                 f"nand_generic rb_inverted 0 1")
 
-                    if not self._ocdSendCommand("nand probe 0").startsWith("NAND flash device"):
+                    if not self._ocdSendCommand("nand probe 0").startswith("NAND flash device"):
                         raise Exception("Flash probe failed!")
 
                     nand_info = self._ocdSendCommand(
