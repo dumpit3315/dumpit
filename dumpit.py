@@ -2438,7 +2438,7 @@ class MainApp(main.main):
                         self._ocdSendCommand(
                             f"msm7200 skip_init 0 {int(self.skip_init)}")
 
-                    elif selPlat["mode"] == 7:
+                    elif selPlat["mode"] == 5:
                         self._ocdSendCommand(
                             f"nand_generic ale 0 {selPlat['flash_addr']}")
 
