@@ -189,6 +189,9 @@ class main ( wx.Frame ):
 		self.bReconnectRemote = wx.Button( self.dPage1, wx.ID_ANY, u"Reconnect to Remote", wx.DefaultPosition, wx.DefaultSize, 0 )
 		bSizer611112.Add( self.bReconnectRemote, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
+		self.bScanChain = wx.Button( self.dPage1, wx.ID_ANY, u"Scan Chain", wx.DefaultPosition, wx.DefaultSize, 0 )
+		bSizer611112.Add( self.bScanChain, 0, wx.ALL, 5 )
+
 
 		bSizer5.Add( bSizer611112, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
 
@@ -634,6 +637,7 @@ class main ( wx.Frame ):
 		self.bConnectRemote.Bind( wx.EVT_BUTTON, self.doConnectRemote )
 		self.bForwardRemote.Bind( wx.EVT_BUTTON, self.doForwardRemote )
 		self.bReconnectRemote.Bind( wx.EVT_BUTTON, self.doReconnectRemote )
+		self.bScanChain.Bind( wx.EVT_BUTTON, self.doScanChain )
 		self.bDumpFlash.Bind( wx.EVT_BUTTON, self.doReadFlash )
 		self.bDumpMemory.Bind( wx.EVT_BUTTON, self.doReadMemory )
 		self.bStop.Bind( wx.EVT_BUTTON, self.doStop )
@@ -699,6 +703,9 @@ class main ( wx.Frame ):
 		event.Skip()
 
 	def doReconnectRemote( self, event ):
+		event.Skip()
+
+	def doScanChain( self, event ):
 		event.Skip()
 
 	def doReadFlash( self, event ):

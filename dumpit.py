@@ -1743,7 +1743,7 @@ class MainApp(main.main):
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                cwd=os.path.dirname(__file__),
+                #cwd=os.path.dirname(__file__),
             )
 
             self._ocdSendCommand("")
@@ -4266,7 +4266,7 @@ class MainApp(main.main):
             f"reset_config {const._reset_type[self.cResetMode.Selection][1]}"
         )
 
-    def doProcessCmdArrow(self, event: wx.KeyEvent):
+    def doProcessCmdArrow(self, event):
         if event.KeyCode == wx.WXK_UP:
             if self._command_history_index <= 0:
                 return
@@ -4292,8 +4292,27 @@ class MainApp(main.main):
         else:
             event.Skip()
 
+    def doScanChain(self, event: wx.CommandEvent):
+        IC = getInitCmd(self, True)
+        
+        self.status.Value = f'Command-line arguments: openocd -c "{IC}"\n\n'
+        self._ocd = subprocess.Popen(
+            [getOCDExec(), "-c", IC],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            #cwd=os.path.dirname(__file__),
+        )        
+        
+        self._logThreadQueue = queue.Queue()
+        
+        self._logThread = threading.Thread(target=self._doLogging)
+        self._logThread.daemon = True
 
-def getInitCmd(self: MainApp):
+        self._logThread.start()
+        self._ocd.wait()
+
+def getInitCmd(self: MainApp, scanMode: bool=False):
     cInit = (
         const._interfaces[self.cInterface.Selection][1]
         .replace("(FT232R_VID)", self.tUSBID.Value.split(":")[0])
@@ -4337,6 +4356,10 @@ def getInitCmd(self: MainApp):
         INIT_CMD += f"jtag_rclk 1000; "
     else:
         INIT_CMD += f"adapter speed {self.nSpeed.Value}; "
+
+    if scanMode:
+        INIT_CMD += "init; sleep 2000; shutdown"
+        return INIT_CMD
 
     t = -1
     isBig = False
