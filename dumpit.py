@@ -36,6 +36,7 @@ from controller import qcom_nandregs
 from controller import common_nandregs
 from controller import bcm_nandregs
 from controller import pxa3_nandregs
+from controller import pnx_nandregs
 import tempfile
 import io
 import struct
@@ -1743,7 +1744,7 @@ class MainApp(main.main):
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                #cwd=os.path.dirname(__file__),
+                # cwd=os.path.dirname(__file__),
             )
 
             self._ocdSendCommand("")
@@ -2505,7 +2506,7 @@ class MainApp(main.main):
                             f"nand_generic cle 0 {selPlat['flash_cmd']}")
                         self._ocdSendCommand(
                             f"nand_generic cle_mask 0 {selPlat['cle_mask']}")
-                        
+
                         if selPlat['flash_wait'] is not None:
                             self._ocdSendCommand(
                                 f"nand_generic rb 0 {selPlat['flash_wait']}")
@@ -2514,7 +2515,7 @@ class MainApp(main.main):
                         else:
                             self._ocdSendCommand(
                                 f"nand_generic rb 0 {selPlat['flash_buffer']}")
-                            
+
                         self._ocdSendCommand(
                             f"nand_generic re 0 {selPlat['flash_buffer']}")
 
@@ -3225,6 +3226,79 @@ class MainApp(main.main):
                             NANDC._page_width = int(
                                 self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"]
                             )
+
+                    if self.cNandSize.Selection == 2:
+                        if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                            NANDC._page_size = int(
+                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_extended"]
+                            )
+
+                    if MFR_ID_HEX in self._nand_idcodes["mfrids"]:
+                        self._logThreadQueue.put(
+                            f'Found NAND with an idcode of {hex(NANDC._idcode)}, which is manufacturered by {self._nand_idcodes["mfrids"][MFR_ID_HEX]}'
+                        )
+
+                    else:
+                        self._logThreadQueue.put(
+                            f"Found NAND with an idcode of {hex(NANDC._idcode)}, from unknown manufacturer"
+                        )
+
+                    if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                        NAND_INFO = self._nand_idcodes["devids"][DEV_ID_HEX]
+
+                        self._logThreadQueue.put(
+                            f'Page size: {NAND_INFO["page_size"] if not NAND_INFO["is_extended"] else (1024 << (NANDC._idcode & 0x3))}'
+                        )
+                        self._logThreadQueue.put(
+                            f'Spare size: {NAND_INFO["spare_size"]}'
+                        )
+                        self._logThreadQueue.put(
+                            f'Flash size: {NAND_INFO["flash_size"] >> 20}MB'
+                        )
+                        self._logThreadQueue.put(
+                            f'Data width: {(16 if NAND_INFO["is_16bit"] else 8)}'
+                        )
+                        self._logThreadQueue.put(
+                            f'Extended ID: {"none" if not NAND_INFO["is_extended"] else hex(NANDC._idcode & 0xff)}'
+                        )
+
+                        assert (
+                            cOffset < NAND_INFO["flash_size"]
+                            and eOffset < NAND_INFO["flash_size"]
+                        ), "Flash address is out of range"
+
+                elif selPlat["mode"] == 13:
+                    NANDC = pnx_nandregs.PNX6NANDController(
+                        self.cmd_read_u32,
+                        self.cmd_write_u32,
+                        selPlat["flash_regs"],
+                        (
+                            0
+                            if self.cNandSize.Selection == 2
+                            else self.cNandSize.Selection
+                        ),
+                        0,
+                    )
+
+                    _msleep(const._jtag_init_delay)
+
+                    assert NANDC._idcode not in [
+                        0x0,
+                        0xFFFFFFFF,
+                        0xFFFF0000,
+                        0xFFFF00FF,
+                    ], "NAND detect failed"
+
+                    MFR_ID_HEX = f"0x{((NANDC._idcode >> 24) & 0xff):02x}"
+                    DEV_ID_HEX = f"0x{((NANDC._idcode >> 16) & 0xff):02x}"
+
+                    if self.page_width == -1:
+                        if DEV_ID_HEX in self._nand_idcodes["devids"]:
+                            NANDC._page_width = int(
+                                self._nand_idcodes["devids"][DEV_ID_HEX]["is_16bit"]
+                            )
+                    else:
+                        NANDC._page_width = self.page_width
 
                     if self.cNandSize.Selection == 2:
                         if DEV_ID_HEX in self._nand_idcodes["devids"]:
@@ -4294,25 +4368,26 @@ class MainApp(main.main):
 
     def doScanChain(self, event: wx.CommandEvent):
         IC = getInitCmd(self, True)
-        
+
         self.status.Value = f'Command-line arguments: openocd -c "{IC}"\n\n'
         self._ocd = subprocess.Popen(
             [getOCDExec(), "-c", IC],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            #cwd=os.path.dirname(__file__),
-        )        
-        
+            # cwd=os.path.dirname(__file__),
+        )
+
         self._logThreadQueue = queue.Queue()
-        
+
         self._logThread = threading.Thread(target=self._doLogging)
         self._logThread.daemon = True
 
         self._logThread.start()
         self._ocd.wait()
 
-def getInitCmd(self: MainApp, scanMode: bool=False):
+
+def getInitCmd(self: MainApp, scanMode: bool = False):
     cInit = (
         const._interfaces[self.cInterface.Selection][1]
         .replace("(FT232R_VID)", self.tUSBID.Value.split(":")[0])
@@ -4505,7 +4580,7 @@ if __name__ == "__main__":
         os.environ.get("DUMPIT_IPV4_ONLY", "0") == "1"
     )
 
-    #if len(sys.argv) <= 1:
+    # if len(sys.argv) <= 1:
     try:
         app = wx.App(True)
 
@@ -4527,18 +4602,18 @@ if __name__ == "__main__":
     #             for i, c in enumerate(const._platforms):
     #                 if c["mode"] in [1, 2, 4, 3, 5, 9] and "platform" in c:
     #                     print(f"  {i}: {c['name']}")
-                
+
     #         else:
     #             tid, start, size, output = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), sys.argv[5]
-                
+
     #             if tid >= 0 and tid < len(const._platforms):
     #                 curPlat = const._platforms[tid]
-    #                 if curPlat["mode"] in [1, 2, 4, 3, 5, 9] and "platform" in curPlat:                        
+    #                 if curPlat["mode"] in [1, 2, 4, 3, 5, 9] and "platform" in curPlat:
     #                     sys.exit(0)
-                    
+
     #             print(f"Target {tid} is not on the platform list/unsupported for quickdump")
     #             sys.exit(1)
-            
+
     #     else:
     #         print(f"Unknown type {sys.argv[1]}. Run Dumpit without any arguments to use a GUI, or quickdump [target_id] [start] [size] [output] to perform dump via OpenOCD NAND API")
     #         sys.exit(1)
