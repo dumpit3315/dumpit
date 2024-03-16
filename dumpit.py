@@ -2643,7 +2643,6 @@ class MainApp(main.main):
                             if self.cNandSize.Selection == 2
                             else self.cNandSize.Selection
                         ),
-                        page_width=self.page_width,
                         skip_init=self.skip_init,
                         skip_gpio_init=self.skip_gpio_init,
                         devid=self.nand_dev_id,
